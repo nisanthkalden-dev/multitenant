@@ -12,6 +12,7 @@ import com.nexora.crm.exception.DuplicateResourceException;
 import com.nexora.crm.exception.ResourceNotFoundException;
 import com.nexora.crm.repository.CompanyRepository;
 import com.nexora.crm.repository.UserRepository;
+import com.nexora.crm.security.CustomUserDetails;
 import com.nexora.crm.security.TenantContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -192,15 +193,66 @@ public class UserService {
 
     @Transactional
     public void changeCurrentUserPassword(PasswordChangeRequest request) {
-        String currentUserId = tenantContext.getCurrentUserId();
-        User user = userRepository.findByUserIdIgnoreCase(currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + currentUserId));
+        if (request == null) {
+            throw new BusinessRuleException("Password update request cannot be empty.");
+        }
 
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash()) && !"Password123".equals(request.getOldPassword())) {
+        String currentPassword = request.getOldPassword();
+        if (currentPassword == null || currentPassword.isBlank()) {
+            throw new BusinessRuleException("Current password is required.");
+        }
+
+        String newPassword = request.getNewPassword();
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BusinessRuleException("New password is required.");
+        }
+
+        if (newPassword.length() < 6) {
+            throw new BusinessRuleException("New password must be at least 6 characters.");
+        }
+
+        if (newPassword.equals(currentPassword)) {
+            throw new BusinessRuleException("New password cannot be the same as the current password.");
+        }
+
+        CustomUserDetails userDetails = tenantContext.getCurrentUserDetails();
+        if (userDetails == null) {
+            throw new ResourceNotFoundException("No authenticated security context found.");
+        }
+
+        // Accurately locate user record by email, then userId, or id
+        User user = null;
+        if (userDetails.getEmail() != null && !userDetails.getEmail().isBlank()) {
+            user = userRepository.findByEmailIgnoreCase(userDetails.getEmail()).orElse(null);
+        }
+        if (user == null && userDetails.getUserId() != null && !userDetails.getUserId().isBlank()) {
+            user = userRepository.findByUserIdIgnoreCase(userDetails.getUserId()).orElse(null);
+        }
+        if (user == null && userDetails.getId() != null) {
+            user = userRepository.findById(userDetails.getId()).orElse(null);
+        }
+
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found in database.");
+        }
+
+        if (!Boolean.TRUE.equals(user.getIsActive()) || "Inactive".equalsIgnoreCase(user.getStatus())) {
+            throw new BusinessRuleException("Account is deactivated. Cannot change password.");
+        }
+
+        // Verify current password with BCrypt
+        boolean matches = passwordEncoder.matches(currentPassword, user.getPasswordHash());
+        // Safe backward-compat fallback if legacy plain-text password exists
+        if (!matches && currentPassword.equals(user.getPasswordHash())) {
+            matches = true;
+        }
+
+        if (!matches) {
             throw new BusinessRuleException("Incorrect current password.");
         }
 
-        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
-        userRepository.save(user);
+        // Hash new password using BCrypt and save
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.saveAndFlush(user);
     }
 }

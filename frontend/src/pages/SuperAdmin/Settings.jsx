@@ -90,10 +90,35 @@ export default function SuperAdminSettings() {
     }
   };
 
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+
   const handlePasswordSave = async (e) => {
     e.preventDefault();
+    setPasswordError('');
+
+    if (!securityPassword.currentPassword) {
+      setPasswordError('Current password is required.');
+      return;
+    }
+
+    if (!securityPassword.newPassword) {
+      setPasswordError('New password is required.');
+      return;
+    }
+
+    if (securityPassword.newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+
     if (securityPassword.newPassword !== securityPassword.confirmPassword) {
-      alert('New passwords do not match.');
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    if (securityPassword.newPassword === securityPassword.currentPassword) {
+      setPasswordError('New password cannot be the same as the current password.');
       return;
     }
     try {
@@ -105,6 +130,20 @@ export default function SuperAdminSettings() {
       showSaveSuccess('Security password');
     } catch (err) {
       alert(err.message || 'Failed to update password');
+
+    setPasswordSubmitting(true);
+    try {
+      await userApi.changePassword({
+        currentPassword: securityPassword.currentPassword,
+        oldPassword: securityPassword.currentPassword,
+        newPassword: securityPassword.newPassword
+      });
+      setSecurityPassword({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showSaveSuccess('Password updated successfully');
+    } catch (err) {
+      setPasswordError(err.message || 'Failed to update password. Please check your current password.');
+    } finally {
+      setPasswordSubmitting(false);
     }
   };
 
@@ -513,9 +552,14 @@ export default function SuperAdminSettings() {
                     />
                   </div>
                 </div>
+                {passwordError && (
+                  <div className="alert alert-error font-mono mb-4" style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem' }}>
+                    {passwordError}
+                  </div>
+                )}
                 <div className="sa-form-footer sa-security-pw-footer mt-5">
-                  <button type="submit" className="btn btn-primary font-mono sa-btn-security">
-                    Update Password
+                  <button type="submit" disabled={passwordSubmitting} className="btn btn-primary font-mono sa-btn-security">
+                    {passwordSubmitting ? 'Updating...' : 'Update Password'}
                   </button>
                 </div>
               </form>

@@ -371,10 +371,10 @@ export default function Login() {
                 <button
                   type="button"
                   className="demo-cred-btn"
-                  onClick={() => fillCredentials('superadmin', 'SuperAdmin123!')}
+                  onClick={() => fillCredentials('superadmin@nexora.com', 'SuperAdmin123!')}
                 >
                   <span className="demo-cred-role font-mono">Super Admin</span>
-                  <span className="demo-cred-pill font-mono">superadmin</span>
+                  <span className="demo-cred-pill font-mono">superadmin@nexora.com</span>
                 </button>
               </div>
             ) : (

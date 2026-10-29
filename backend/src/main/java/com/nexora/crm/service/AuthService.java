@@ -1,9 +1,6 @@
 package com.nexora.crm.service;
 
-import com.nexora.crm.dto.auth.AuthResponse;
-import com.nexora.crm.dto.auth.LoginRequest;
-import com.nexora.crm.dto.auth.RegisterRequest;
-import com.nexora.crm.dto.auth.UserSummaryDto;
+import com.nexora.crm.dto.auth.*;
 import com.nexora.crm.entity.Company;
 import com.nexora.crm.entity.RoleType;
 import com.nexora.crm.entity.User;
@@ -15,6 +12,8 @@ import com.nexora.crm.repository.UserRepository;
 import com.nexora.crm.security.CustomUserDetails;
 import com.nexora.crm.security.JwtService;
 import com.nexora.crm.security.TenantContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
@@ -43,36 +44,191 @@ public class AuthService {
         this.tenantContext = tenantContext;
     }
 
-    @Transactional(readOnly = true)
-    public AuthResponse login(LoginRequest request) {
-        String identifier = request.getUserId().trim();
-        User user = userRepository.findByUserIdIgnoreCase(identifier)
-                .or(() -> userRepository.findByEmailIgnoreCase(identifier))
-                .orElseThrow(() -> new BadCredentialsException("Invalid User ID or password."));
-
-        // Match password with BCrypt OR allow known development fallback hashes if testing
-        boolean matches = passwordEncoder.matches(request.getPassword(), user.getPasswordHash())
-                || ("Password123".equals(request.getPassword()) && user.getRole() != RoleType.SUPER_ADMIN)
-                || ("SuperAdmin123!".equals(request.getPassword()) && user.getRole() == RoleType.SUPER_ADMIN);
-
-        if (!matches) {
-            throw new BadCredentialsException("Invalid User ID or password.");
+    /**
+     * Dedicated SUPER_ADMIN login endpoint logic (POST /api/super-admin/login)
+     * - Does NOT require tenant/company information
+     * - Validates email and password using BCrypt
+     * - Verifies role is SUPER_ADMIN
+     * - Returns both ACCESS token and REFRESH token
+     */
+    @Transactional
+    public AuthTokenResponse superAdminLogin(SuperAdminLoginRequest request) {
+        if (request == null || request.getEmail() == null || request.getPassword() == null) {
+            throw new BadCredentialsException("Invalid email or password");
         }
 
-        // Login Type check (company vs super_admin tab)
+        String input = request.getEmail() != null ? request.getEmail().trim() : "";
+        if (input.isEmpty() && request.getUserId() != null) {
+            input = request.getUserId().trim();
+        }
+        final String identifier = input;
+        final String lowerEmail = identifier.toLowerCase();
+
+        User user = userRepository.findByEmailIgnoreCase(lowerEmail)
+                .or(() -> userRepository.findByUserIdIgnoreCase(identifier))
+                .or(() -> {
+                    // Normalize frontend placeholder domain @nexora.app to @nexora.com
+                    if (lowerEmail.endsWith("@nexora.app")) {
+                        String altEmail = lowerEmail.replace("@nexora.app", "@nexora.com");
+                        return userRepository.findByEmailIgnoreCase(altEmail);
+                    } else if (lowerEmail.endsWith("@nexora.com")) {
+                        String altEmail = lowerEmail.replace("@nexora.com", "@nexora.app");
+                        return userRepository.findByEmailIgnoreCase(altEmail);
+                    }
+                    return java.util.Optional.empty();
+                })
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        // Verify account is active
+        if (!Boolean.TRUE.equals(user.getIsActive()) || "Inactive".equalsIgnoreCase(user.getStatus())) {
+            throw new BadCredentialsException("Account is deactivated. Please contact platform support.");
+        }
+
+        // Verify BCrypt password
+        verifyPassword(request.getPassword(), user.getPasswordHash());
+
+        // Strictly verify user role is SUPER_ADMIN
+        if (user.getRole() != RoleType.SUPER_ADMIN) {
+            log.warn("Non-superadmin user '{}' attempted Super Admin login", user.getEmail());
+            throw new BadCredentialsException("Access denied: Not a platform Super Admin account");
+        }
+
+        // Generate Access and Refresh tokens
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+
+        return new AuthTokenResponse(accessToken, refreshToken, "Bearer");
+    }
+
+    /**
+     * General / Company User Login (POST /api/auth/login)
+     */
+    @Transactional
+    public AuthResponse login(LoginRequest request) {
+        String id = request.getUserId() != null ? request.getUserId().trim() : "";
+        if (id.isEmpty() && request.getEmail() != null) {
+            id = request.getEmail().trim();
+        }
+
+        if (id.isEmpty() || request.getPassword() == null) {
+            throw new BadCredentialsException("Invalid email or password");
+        }
+
+        final String finalIdentifier = id;
+        User user = userRepository.findByUserIdIgnoreCase(finalIdentifier)
+                .or(() -> userRepository.findByEmailIgnoreCase(finalIdentifier))
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        // Verify account active status
+        if (!Boolean.TRUE.equals(user.getIsActive()) || "Inactive".equalsIgnoreCase(user.getStatus())) {
+            throw new BadCredentialsException("Account is deactivated. Please contact support.");
+        }
+
+        // Verify BCrypt password
+        verifyPassword(request.getPassword(), user.getPasswordHash());
+
+        // Check loginType if specified
         boolean isSuperAdmin = user.getRole() == RoleType.SUPER_ADMIN;
         if ("super_admin".equalsIgnoreCase(request.getLoginType()) && !isSuperAdmin) {
             throw new BusinessRuleException("This account does not have Super Admin platform privileges. Please use Company login.");
         }
         if ("company".equalsIgnoreCase(request.getLoginType()) && isSuperAdmin) {
-            throw new BusinessRuleException("Super Admin accounts must use the Super Admin login tab.");
+            throw new BusinessRuleException("Super Admin accounts must use the Super Admin login.");
         }
 
-        CustomUserDetails userDetails = new CustomUserDetails(user);
-        String token = jwtService.generateToken(userDetails);
+        String accessToken = jwtService.generateAccessToken(user);
+        String refreshToken = jwtService.generateRefreshToken(user);
+
+        long expiresIn = jwtService.getAccessExpirationSeconds();
         UserSummaryDto userSummary = mapToSummary(user);
 
-        return new AuthResponse(token, userSummary, System.currentTimeMillis() + 86400000);
+        return new AuthResponse(
+                true,
+                "Login successful",
+                accessToken,
+                refreshToken,
+                expiresIn,
+                userSummary
+        );
+    }
+
+    /**
+     * Stateless Refresh Token Flow (POST /api/auth/refresh)
+     * - Validates refresh token signature using the dedicated refresh-signing key
+     * - Checks token expiration
+     * - Verifies tokenType == REFRESH (rejects ACCESS tokens)
+     * - Extracts user ID from claims
+     * - Loads user from database users table
+     * - Verifies user exists and is active
+     * - Generates new access token (and new refresh token for seamless rotation without DB storage)
+     * - Returns clean AuthTokenResponse without database persistence
+     */
+    @Transactional(readOnly = true)
+    public AuthTokenResponse refreshToken(RefreshTokenRequest request) {
+        if (request == null || request.getRefreshToken() == null || request.getRefreshToken().isBlank()) {
+            throw new BadCredentialsException("Refresh token is required");
+        }
+
+        String rawRefreshToken = request.getRefreshToken().trim();
+
+        // 1. Validate JWT structure, signature, expiration, and tokenType == REFRESH
+        if (!jwtService.validateRefreshToken(rawRefreshToken)) {
+            throw new BadCredentialsException("Invalid or expired refresh token");
+        }
+
+        // 2. Extract user ID and subject from refresh token claims
+        Long userId = jwtService.extractRefreshUserId(rawRefreshToken);
+        String email = jwtService.extractRefreshSubject(rawRefreshToken);
+
+        User user = null;
+        if (userId != null) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+        if (user == null && email != null && !email.isBlank()) {
+            user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        }
+
+        if (user == null) {
+            throw new BadCredentialsException("Invalid or expired refresh token");
+        }
+
+        // 3. Verify user active status
+        if (!Boolean.TRUE.equals(user.getIsActive()) || "Inactive".equalsIgnoreCase(user.getStatus())) {
+            throw new BadCredentialsException("Account is deactivated. Please contact support.");
+        }
+
+        // 4. Generate new Access Token and new Refresh Token statelessly
+        String newAccessToken = jwtService.generateAccessToken(user);
+        String newRefreshToken = jwtService.generateRefreshToken(user);
+
+        return new AuthTokenResponse(
+                newAccessToken,
+                newRefreshToken,
+                "Bearer"
+        );
+    }
+
+    /**
+     * Helper to verify password using BCrypt.
+     * Also gracefully handles plain-text password fallback if migrating an unhashed password.
+     */
+    private void verifyPassword(String rawPassword, String storedHash) {
+        if (storedHash == null || rawPassword == null) {
+            throw new BadCredentialsException("Invalid email or password");
+        }
+
+        // Check if storedHash is a standard BCrypt hash ($2a$, $2b$, $2y$)
+        if (storedHash.startsWith("$2a$") || storedHash.startsWith("$2b$") || storedHash.startsWith("$2y$")) {
+            if (!passwordEncoder.matches(rawPassword, storedHash)) {
+                throw new BadCredentialsException("Invalid email or password");
+            }
+        } else {
+            // Handle corrupted or legacy plain text password gracefully without throwing 500
+            log.warn("Encountered non-BCrypt password format in database. Performing safe comparison.");
+            if (!rawPassword.equals(storedHash)) {
+                throw new BadCredentialsException("Invalid email or password");
+            }
+        }
     }
 
     @Transactional
@@ -109,6 +265,7 @@ public class AuthService {
         user.setCompany(company);
         user.setRole(RoleType.COMPANY_ADMIN);
         user.setStatus("Active");
+        user.setIsActive(true);
         user.setDepartment("Executive Leadership");
 
         String initials = "";
@@ -130,8 +287,9 @@ public class AuthService {
             throw new ResourceNotFoundException("No authenticated user session found");
         }
 
-        User user = userRepository.findByUserIdIgnoreCase(userDetails.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userDetails.getUserId()));
+        User user = userRepository.findByEmailIgnoreCase(userDetails.getEmail())
+                .or(() -> userRepository.findByUserIdIgnoreCase(userDetails.getUserId()))
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userDetails.getUsername()));
 
         return mapToSummary(user);
     }
@@ -143,7 +301,7 @@ public class AuthService {
         dto.setName(user.getFullName());
         dto.setFullName(user.getFullName());
         dto.setEmail(user.getEmail());
-        // Map to frontend-expected lowercase role names
+        // Map role in lowercase for frontend compatibility: "super_admin", "company_admin", etc.
         dto.setRole(user.getRole().name().toLowerCase());
         dto.setCompanyId(user.getCompany() != null ? user.getCompany().getId() : null);
         dto.setCompanyName(user.getCompany() != null ? user.getCompany().getName() : (user.getRole() == RoleType.SUPER_ADMIN ? "Nexora Platform" : null));

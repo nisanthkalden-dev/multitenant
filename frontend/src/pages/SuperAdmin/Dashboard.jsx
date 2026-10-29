@@ -302,8 +302,8 @@ export default function SuperAdminDashboard() {
                         </div>
                       </td>
                       <td>
-                        <div className="sa-owner-name">{comp.owner.name}</div>
-                        <div className="sa-owner-email font-mono">{comp.owner.email}</div>
+                        <div className="sa-owner-name">{comp.owner?.name || 'Admin'}</div>
+                        <div className="sa-owner-email font-mono">{comp.owner?.email || comp.email}</div>
                       </td>
                       <td>
                         <span className="sa-plan-pill font-mono">{comp.plan}</span>
@@ -354,7 +354,7 @@ export default function SuperAdminDashboard() {
                   <div className="sa-mobile-card-details font-mono">
                     <div className="sa-mobile-meta-row">
                       <span className="sa-meta-lbl">Admin:</span>
-                      <span className="sa-meta-val">{comp.owner.name}</span>
+                      <span className="sa-meta-val">{comp.owner?.name || 'Admin'}</span>
                     </div>
                     <div className="sa-mobile-meta-row">
                       <span className="sa-meta-lbl">Plan:</span>
