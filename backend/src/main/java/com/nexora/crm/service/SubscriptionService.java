@@ -129,8 +129,21 @@ public class SubscriptionService {
         if (request.getAmount() != null) sub.setAmount(request.getAmount());
         if (request.getStatus() != null) sub.setStatus(request.getStatus());
         if (request.getRenewalDate() != null) sub.setRenewalDate(request.getRenewalDate());
+        if (request.getAutoRenew() != null) sub.setAutoRenew(request.getAutoRenew());
 
         Subscription updated = subscriptionRepository.save(sub);
+
+        // Keep company profile in sync
+        Company company = sub.getCompany();
+        if (company != null) {
+            if (request.getPlan() != null) company.setPlan(request.getPlan());
+            if (request.getBillingCycle() != null) company.setBillingCycle(request.getBillingCycle());
+            if (request.getAmount() != null) company.setPrice(request.getAmount());
+            if (request.getStatus() != null) company.setStatus(request.getStatus());
+            if (request.getRenewalDate() != null) company.setRenewalDate(request.getRenewalDate());
+            companyRepository.save(company);
+        }
+
         return mapToSubscriptionDto(updated);
     }
 

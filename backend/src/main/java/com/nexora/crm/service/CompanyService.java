@@ -58,6 +58,7 @@ public class CompanyService {
         return page.map(this::mapToResponse);
     }
 
+
     @Transactional(readOnly = true)
     public CompanyResponse getCompanyById(String companyId) {
         tenantContext.validateTenantAccess(companyId);
@@ -68,16 +69,28 @@ public class CompanyService {
 
     @Transactional
     public CompanyResponse createCompany(CompanyRequest request) {
-        String companyId = "COMP" + String.format("%03d", (companyRepository.count() + 1));
         if (companyRepository.existsByNameIgnoreCase(request.getName().trim())) {
-            throw new DuplicateResourceException("Company with name '" + request.getName() + "' already exists.");
+            throw new DuplicateResourceException("Company with name '" + request.getName().trim() + "' already exists.");
+        }
+
+        String companyEmail = request.getEmail().trim().toLowerCase();
+        if (companyRepository.existsByEmailIgnoreCase(companyEmail)) {
+            throw new DuplicateResourceException("Company with email '" + companyEmail + "' already exists.");
+        }
+
+        // Generate safe unique company ID (e.g. COMP002, COMP003...)
+        long count = companyRepository.count() + 1;
+        String companyId = "COMP" + String.format("%03d", count);
+        while (companyRepository.existsByIdIgnoreCase(companyId)) {
+            count++;
+            companyId = "COMP" + String.format("%03d", count);
         }
 
         Company company = new Company();
         company.setId(companyId);
         company.setName(request.getName().trim());
-        company.setEmail(request.getEmail().trim().toLowerCase());
-        company.setPhone(request.getPhone().trim());
+        company.setEmail(companyEmail);
+        company.setPhone(request.getPhone() != null ? request.getPhone().trim() : "");
         company.setAddress(request.getAddress());
         company.setPlan(request.getPlan() != null ? request.getPlan() : "Growth");
         company.setBillingCycle(request.getBillingCycle() != null ? request.getBillingCycle() : "Monthly");
@@ -86,6 +99,9 @@ public class CompanyService {
         company.setUserLimit(request.getUserLimit() != null ? request.getUserLimit() : 20);
 
         String domainClean = request.getName().toLowerCase().replaceAll("[^a-z0-9]", "");
+        if (domainClean.isBlank()) {
+            domainClean = "company" + System.currentTimeMillis();
+        }
         company.setWorkspace(domainClean + ".nexora.app");
         company.setDomain(request.getDomain() != null ? request.getDomain() : domainClean + ".com");
 
@@ -94,6 +110,7 @@ public class CompanyService {
             if (!w.isEmpty()) initials += w.charAt(0);
             if (initials.length() >= 2) break;
         }
+        if (initials.isBlank()) initials = "CO";
         company.setLogo(initials.toUpperCase());
         company.setLogoColor("var(--tertiary)");
         company.setRenewalDate("Nov 24, 2026");
@@ -111,30 +128,47 @@ public class CompanyService {
         sub.setPlanName(savedCompany.getPlan());
         sub.setBillingCycle(savedCompany.getBillingCycle());
         sub.setAmount(savedCompany.getPrice());
-        sub.setStatus("Active");
+        sub.setStatus(savedCompany.getStatus());
         sub.setStartDate("Today");
         sub.setRenewalDate(savedCompany.getRenewalDate());
         subscriptionRepository.save(sub);
 
-        // If admin credentials provided or auto-create company admin
-        String adminEmail = request.getAdminEmail() != null ? request.getAdminEmail().trim() : request.getEmail().trim();
-        String adminName = request.getAdminName() != null ? request.getAdminName().trim() : request.getName() + " Admin";
-        String adminUserId = request.getAdminUserId() != null ? request.getAdminUserId().trim() : "adm_" + domainClean;
+        // Create Company Administrator and link to this company
+        String adminEmail = (request.getAdminEmail() != null && !request.getAdminEmail().isBlank())
+                ? request.getAdminEmail().trim().toLowerCase()
+                : companyEmail;
+        String adminName = (request.getAdminName() != null && !request.getAdminName().isBlank())
+                ? request.getAdminName().trim()
+                : request.getName() + " Admin";
+        String adminUserId = (request.getAdminUserId() != null && !request.getAdminUserId().isBlank())
+                ? request.getAdminUserId().trim()
+                : "adm_" + domainClean;
 
-        if (!userRepository.existsByUserIdIgnoreCase(adminUserId) && !userRepository.existsByEmailIgnoreCase(adminEmail)) {
-            User adminUser = new User();
-            adminUser.setUserId(adminUserId);
-            adminUser.setFullName(adminName);
-            adminUser.setEmail(adminEmail);
-            String pwd = request.getAdminPassword() != null ? request.getAdminPassword() : "Password123";
-            adminUser.setPasswordHash(passwordEncoder.encode(pwd));
-            adminUser.setRole(RoleType.COMPANY_ADMIN);
-            adminUser.setCompany(savedCompany);
-            adminUser.setDepartment("Executive Leadership");
-            adminUser.setAvatar(initials.toUpperCase());
-            adminUser.setStatus("Active");
-            userRepository.save(adminUser);
+        // If email or userId already taken, adjust userId to be unique
+        int suffix = 1;
+        String candidateUserId = adminUserId;
+        while (userRepository.existsByUserIdIgnoreCase(candidateUserId)) {
+            candidateUserId = adminUserId + suffix++;
         }
+        adminUserId = candidateUserId;
+
+        if (userRepository.existsByEmailIgnoreCase(adminEmail)) {
+            throw new DuplicateResourceException("User with email '" + adminEmail + "' already exists.");
+        }
+
+        User adminUser = new User();
+        adminUser.setUserId(adminUserId);
+        adminUser.setFullName(adminName);
+        adminUser.setEmail(adminEmail);
+        String pwd = request.getAdminPassword() != null ? request.getAdminPassword() : "Password123";
+        adminUser.setPasswordHash(passwordEncoder.encode(pwd));
+        adminUser.setRole(RoleType.COMPANY_ADMIN);
+        adminUser.setCompany(savedCompany);
+        adminUser.setDepartment("Executive Leadership");
+        adminUser.setAvatar(initials.toUpperCase());
+        adminUser.setStatus("Active");
+        adminUser.setIsActive(true);
+        userRepository.save(adminUser);
 
         return mapToResponse(savedCompany);
     }
@@ -229,4 +263,6 @@ public class CompanyService {
 
         return res;
     }
+
+    
 }

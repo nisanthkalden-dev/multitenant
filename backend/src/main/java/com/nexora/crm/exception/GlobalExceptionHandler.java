@@ -31,13 +31,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<Object>> handleSecurityAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("You do not have permission to execute this operation", HttpStatus.FORBIDDEN.value()));
+                .body(ApiResponse.error("Access denied", HttpStatus.FORBIDDEN.value()));
     }
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Object>> handleBadCredentials(BadCredentialsException ex) {
+        String message = (ex.getMessage() != null && !ex.getMessage().isBlank()) ? ex.getMessage() : "Invalid email or password";
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Invalid credentials provided", HttpStatus.UNAUTHORIZED.value()));
+                .body(ApiResponse.error(message, HttpStatus.UNAUTHORIZED.value()));
     }
 
     @ExceptionHandler(DuplicateResourceException.class)

@@ -15,6 +15,7 @@ public interface CompanyRepository extends JpaRepository<Company, String> {
 
     boolean existsByIdIgnoreCase(String id);
     boolean existsByNameIgnoreCase(String name);
+    boolean existsByEmailIgnoreCase(String email);
 
     @Query("SELECT c FROM Company c WHERE " +
            "(:search IS NULL OR :search = '' OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(c.phone) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
