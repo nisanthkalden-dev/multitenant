@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useSuperAdmin } from '../../context/SuperAdminContext';
 import AdminLayout from '../../components/SuperAdmin/AdminLayout';
@@ -9,6 +9,9 @@ export default function CompanyDetails() {
   const navigate = useNavigate();
   const { companies, updateCompanyStatus } = useSuperAdmin();
 
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState('');
+
   const company = companies.find((c) => c.id === id);
 
   if (!company) {
@@ -18,7 +21,7 @@ export default function CompanyDetails() {
           <div className="sa-empty-icon">🔍</div>
           <h2 className="sa-empty-title">Company dossier not found</h2>
           <p className="sa-empty-desc">
-            The requested organization identifier <code className="font-mono">{id}</code> does not exist in local records.
+            The requested organization identifier <code className="font-mono">{id}</code> does not exist in records.
           </p>
           <Link to="/super-admin/companies" className="btn btn-primary font-mono mt-4">
             Return to Companies List
@@ -30,8 +33,16 @@ export default function CompanyDetails() {
 
   const isSuspended = company.status === 'Suspended';
 
-  const toggleStatus = () => {
-    updateCompanyStatus(company.id, isSuspended ? 'Active' : 'Suspended');
+  const toggleStatus = async () => {
+    setUpdating(true);
+    setUpdateError('');
+    try {
+      await updateCompanyStatus(company.id, isSuspended ? 'Active' : 'Suspended');
+    } catch (err) {
+      setUpdateError(err.message || 'Failed to update company status');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   return (
@@ -98,12 +109,16 @@ export default function CompanyDetails() {
         </div>
 
         <div className="sa-company-header-actions">
+          {updateError && (
+            <span className="text-danger text-xs font-mono mr-2">{updateError}</span>
+          )}
           <button
             type="button"
             className={`btn font-mono ${isSuspended ? 'btn-primary' : 'btn-outline-danger'}`}
+            disabled={updating}
             onClick={toggleStatus}
           >
-            {isSuspended ? 'Reactivate Tenant' : 'Suspend Tenant'}
+            {updating ? 'Updating...' : (isSuspended ? 'Reactivate Tenant' : 'Suspend Tenant')}
           </button>
         </div>
       </div>

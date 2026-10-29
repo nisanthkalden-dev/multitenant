@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.nexora.crm.MultiTenantCrmTests" time="6.99" tests="7" errors="0" skipped="0" failures="0">
 <testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="com.nexora.crm.MultiTenantCrmTests" time="11.623" tests="13" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
@@ -15,6 +16,8 @@
     <property name="java.vm.specification.version" value="21"/>
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="IN"/>
+    <property name="sun.boot.library.path" value="C:\Program Files\Microsoft\jdk-21.0.12.101-hotspot\bin"/>
+    <property name="sun.java.command" value="C:\Users\Nisanth kalden M\AppData\Local\Temp\surefire6406393386221612398\surefirebooter-20261029105227836_3.jar C:\Users\Nisanth kalden M\AppData\Local\Temp\surefire6406393386221612398 2026-10-29T10-52-27_725-jvmRun1 surefire-20261029105227836_1tmp surefire_0-20261029105227836_2tmp"/>
     <property name="sun.boot.library.path" value="C:\Program Files\Java\jdk-21\bin"/>
     <property name="sun.java.command" value="C:\Users\HI\AppData\Local\Temp\surefire6508443111102220690\surefirebooter-20261029113326901_3.jar C:\Users\HI\AppData\Local\Temp\surefire6508443111102220690 2026-10-29T11-33-26_754-jvmRun1 surefire-20261029113326901_1tmp surefire_0-20261029113326901_2tmp"/>
     <property name="jdk.debug" value="release"/>
@@ -34,6 +37,7 @@
     <property name="java.specification.name" value="Java Platform API Specification"/>
     <property name="FILE_LOG_CHARSET" value="UTF-8"/>
     <property name="java.awt.headless" value="true"/>
+    <property name="surefire.real.class.path" value="C:\Users\Nisanth kalden M\AppData\Local\Temp\surefire6406393386221612398\surefirebooter-20261029105227836_3.jar"/>
     <property name="surefire.real.class.path" value="C:\Users\HI\AppData\Local\Temp\surefire6508443111102220690\surefirebooter-20261029113326901_3.jar"/>
     <property name="user.script" value=""/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
@@ -53,6 +57,7 @@
     <property name="user.dir" value="D:\multitenant\multitenant\backend"/>
     <property name="os.arch" value="amd64"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="PID" value="2992"/>
     <property name="PID" value="16448"/>
     <property name="sun.os.patch.level" value=""/>
     <property name="CONSOLE_LOG_CHARSET" value="UTF-8"/>
@@ -66,6 +71,9 @@
     <property name="java.class.version" value="65.0"/>
     <property name="LOGGED_APPLICATION_NAME" value="[nexora-crm-backend] "/>
   </properties>
+  <testcase name="testLeadAndTaskOperations" classname="com.nexora.crm.MultiTenantCrmTests" time="0.838">
+    <system-out><![CDATA[10:52:28.572 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.nexora.crm.MultiTenantCrmTests]: MultiTenantCrmTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+10:52:28.660 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.nexora.crm.CrmApplication for test class com.nexora.crm.MultiTenantCrmTests
   <testcase name="testLeadAndTaskOperations" classname="com.nexora.crm.MultiTenantCrmTests" time="0.969">
     <system-out><![CDATA[11:33:27.772 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.nexora.crm.MultiTenantCrmTests]: MultiTenantCrmTests does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
 11:33:27.891 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.nexora.crm.CrmApplication for test class com.nexora.crm.MultiTenantCrmTests
@@ -79,6 +87,33 @@
 
  :: Spring Boot ::                (v3.3.4)
 
+2026-10-29T10:52:29.000+05:30  INFO 2992 --- [nexora-crm-backend] [           main] com.nexora.crm.MultiTenantCrmTests       : Starting MultiTenantCrmTests using Java 21.0.12.1 with PID 2992 (started by Nisanth kalden M in E:\github\multitenant\backend)
+2026-10-29T10:52:29.002+05:30  INFO 2992 --- [nexora-crm-backend] [           main] com.nexora.crm.MultiTenantCrmTests       : No active profile set, falling back to 1 default profile: "default"
+2026-10-29T10:52:29.805+05:30  INFO 2992 --- [nexora-crm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-10-29T10:52:29.879+05:30  INFO 2992 --- [nexora-crm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 67 ms. Found 11 JPA repository interfaces.
+2026-10-29T10:52:30.467+05:30  INFO 2992 --- [nexora-crm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-29T10:52:30.621+05:30  INFO 2992 --- [nexora-crm-backend] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@83b0d0f
+2026-10-29T10:52:30.623+05:30  INFO 2992 --- [nexora-crm-backend] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-29T10:52:30.698+05:30  INFO 2992 --- [nexora-crm-backend] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://localhost:3306/nexora_crm (MySQL 5.5)
+2026-10-29T10:52:30.742+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 2 migrations (execution time 00:00.022s)
+2026-10-29T10:52:30.757+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema `nexora_crm`: 2
+2026-10-29T10:52:30.757+05:30 ERROR 2992 --- [nexora-crm-backend] [           main] o.f.core.internal.command.DbMigrate      : Schema `nexora_crm` has version 2, but no migration could be resolved in the configured locations !
+2026-10-29T10:52:30.760+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.f.core.internal.command.DbMigrate      : Schema `nexora_crm` is up to date. No migration necessary.
+2026-10-29T10:52:30.837+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-10-29T10:52:30.887+05:30  INFO 2992 --- [nexora-crm-backend] [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.3.Final
+2026-10-29T10:52:30.917+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-10-29T10:52:31.227+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-10-29T10:52:31.268+05:30  WARN 2992 --- [nexora-crm-backend] [           main] org.hibernate.dialect.Dialect            : HHH000511: The 5.5.5 version for [org.hibernate.dialect.MySQLDialect] is no longer supported, hence certain features may not work properly. The minimum supported version is 8.0.0. Check the community dialects project for available legacy versions.
+2026-10-29T10:52:31.271+05:30  WARN 2992 --- [nexora-crm-backend] [           main] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-10-29T10:52:32.051+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-10-29T10:52:32.053+05:30  INFO 2992 --- [nexora-crm-backend] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-10-29T10:52:32.325+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-10-29T10:52:33.248+05:30  INFO 2992 --- [nexora-crm-backend] [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-10-29T10:52:33.250+05:30  WARN 2992 --- [nexora-crm-backend] [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-10-29T10:52:33.975+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-10-29T10:52:33.975+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-10-29T10:52:33.976+05:30  INFO 2992 --- [nexora-crm-backend] [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-10-29T10:52:33.993+05:30  INFO 2992 --- [nexora-crm-backend] [           main] com.nexora.crm.MultiTenantCrmTests       : Started MultiTenantCrmTests in 5.22 seconds (process running for 6.04)
 2026-10-29T11:33:28.301+05:30  INFO 16448 --- [nexora-crm-backend] [           main] com.nexora.crm.MultiTenantCrmTests       : Starting MultiTenantCrmTests using Java 21.0.7 with PID 16448 (started by HI in D:\multitenant\multitenant\backend)
 2026-10-29T11:33:28.302+05:30  INFO 16448 --- [nexora-crm-backend] [           main] com.nexora.crm.MultiTenantCrmTests       : No active profile set, falling back to 1 default profile: "default"
 2026-10-29T11:33:29.670+05:30  INFO 16448 --- [nexora-crm-backend] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
@@ -107,6 +142,12 @@ WARNING: If a serviceability tool is not in use, please run with -Djdk.instrumen
 WARNING: Dynamic loading of agents will be disallowed by default in a future release
 ]]></system-err>
   </testcase>
+  <testcase name="testTenantCustomerListScoping" classname="com.nexora.crm.MultiTenantCrmTests" time="0.113"/>
+  <testcase name="testCustomerLifecycle" classname="com.nexora.crm.MultiTenantCrmTests" time="0.125"/>
+  <testcase name="testCrossTenantAccessProhibited" classname="com.nexora.crm.MultiTenantCrmTests" time="0.087"/>
+  <testcase name="testSuperAdminLoginAndDashboard" classname="com.nexora.crm.MultiTenantCrmTests" time="0.085"/>
+  <testcase name="testEmployeeCannotAccessAdminDashboard" classname="com.nexora.crm.MultiTenantCrmTests" time="0.074"/>
+  <testcase name="testCompanyAdminMe" classname="com.nexora.crm.MultiTenantCrmTests" time="0.081"/>
   <testcase name="testInvalidRefreshToken" classname="com.nexora.crm.MultiTenantCrmTests" time="0.02"/>
   <testcase name="testRefreshTokenFlowAndRotation" classname="com.nexora.crm.MultiTenantCrmTests" time="0.139"/>
   <testcase name="testSuperAdminLoginInvalidPassword" classname="com.nexora.crm.MultiTenantCrmTests" time="0.07"/>

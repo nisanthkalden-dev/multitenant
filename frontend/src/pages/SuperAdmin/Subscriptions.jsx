@@ -230,6 +230,21 @@ export default function SubscriptionsPage() {
                     <div className="sa-plan-user-limit font-mono">{plan.userLimitText}</div>
                   </div>
 
+                <ul className="sa-plan-feature-list">
+                  {(plan.features || []).map((feat, idx) => (
+                    <li key={idx} className="sa-plan-feature-item">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="sa-plan-card-footer">
+                  <div className="sa-plan-stats font-mono">
+                    <span>{plan.stats?.activeCompanies ?? '—'} Companies</span>
+                    <span>{plan.stats?.mrrContribution ?? '—'} MRR</span>
                   <ul className="sa-plan-feature-list">
                     {plan.features?.map((feat, idx) => (
                       <li key={idx} className="sa-plan-feature-item">
@@ -529,6 +544,13 @@ export default function SubscriptionsPage() {
                   />
                 </div>
               </div>
+              <div className="form-group mb-3">
+                <label className="form-label">Features Included</label>
+                <textarea
+                  className="form-input font-mono"
+                  rows="4"
+                  defaultValue={(selectedPlanModal.features || []).join('\n')}
+                />
               <div className="sa-modal-footer">
                 <button
                   type="button"
