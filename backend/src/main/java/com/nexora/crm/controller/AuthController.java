@@ -1,9 +1,6 @@
 package com.nexora.crm.controller;
 
-import com.nexora.crm.dto.auth.AuthResponse;
-import com.nexora.crm.dto.auth.LoginRequest;
-import com.nexora.crm.dto.auth.RegisterRequest;
-import com.nexora.crm.dto.auth.UserSummaryDto;
+import com.nexora.crm.dto.auth.*;
 import com.nexora.crm.dto.common.ApiResponse;
 import com.nexora.crm.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "Authentication", description = "User login, registration, and session APIs")
+@Tag(name = "Authentication", description = "User login, refresh, registration, and session APIs")
 public class AuthController {
 
     private final AuthService authService;
@@ -25,10 +22,17 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @Operation(summary = "Authenticate user and issue JWT token")
+    @Operation(summary = "Authenticate company or platform user and issue tokens")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.ok("Login successful", response));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token using long-lived refresh token")
+    public ResponseEntity<AuthTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        AuthTokenResponse response = authService.refreshToken(request);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/register")

@@ -1,6 +1,27 @@
 import { apiClient } from './apiClient';
 
 export const subscriptionApi = {
+  // Super Admin operations
+  getAllSubscriptions: async ({ page = 0, size = 100 } = {}) => {
+    const params = new URLSearchParams({ page, size });
+    const res = await apiClient(`/super-admin/subscriptions?${params.toString()}`);
+    return res;
+  },
+
+  getSubscriptionById: async (id) => {
+    const res = await apiClient(`/super-admin/subscriptions/${id}`);
+    return res.data;
+  },
+
+  updateSubscription: async (id, subscriptionData) => {
+    const res = await apiClient(`/super-admin/subscriptions/${id}`, {
+      method: 'PUT',
+      body: subscriptionData
+    });
+    return res.data;
+  },
+
+  // Tenant Company operations
   getPlans: async () => {
     const res = await apiClient('/subscription/plans');
     return res.data;

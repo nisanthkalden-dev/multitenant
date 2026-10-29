@@ -1,11 +1,16 @@
 package com.nexora.crm.controller;
 
+import com.nexora.crm.dto.auth.AuthResponse;
+import com.nexora.crm.dto.auth.AuthTokenResponse;
+import com.nexora.crm.dto.auth.SuperAdminLoginRequest;
 import com.nexora.crm.dto.common.ApiResponse;
 import com.nexora.crm.dto.common.PaginationMetadata;
 import com.nexora.crm.dto.company.CompanyRequest;
 import com.nexora.crm.dto.company.CompanyResponse;
 import com.nexora.crm.dto.dashboard.SuperAdminDashboardDto;
 import com.nexora.crm.dto.subscription.SubscriptionDto;
+import com.nexora.crm.entity.Company;
+import com.nexora.crm.service.AuthService;
 import com.nexora.crm.service.CompanyService;
 import com.nexora.crm.service.DashboardService;
 import com.nexora.crm.service.SubscriptionService;
@@ -25,32 +30,48 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/super-admin")
-@PreAuthorize("hasRole('SUPER_ADMIN')")
 @Tag(name = "Super Admin", description = "Global multi-tenant platform management and stats")
 public class SuperAdminController {
 
+    private final AuthService authService;
     private final DashboardService dashboardService;
     private final CompanyService companyService;
     private final SubscriptionService subscriptionService;
 
     public SuperAdminController(
+            AuthService authService,
             DashboardService dashboardService,
             CompanyService companyService,
             SubscriptionService subscriptionService
     ) {
+        this.authService = authService;
         this.dashboardService = dashboardService;
         this.companyService = companyService;
         this.subscriptionService = subscriptionService;
     }
 
+    /**
+     * Dedicated Super Admin Login Endpoint
+     * POST /api/super-admin/login (Publicly accessible)
+     */
+    @PostMapping("/login")
+    @Operation(summary = "Dedicated Super Admin login returning Access and Refresh tokens")
+    public ResponseEntity<AuthTokenResponse> superAdminLogin(@Valid @RequestBody SuperAdminLoginRequest request) {
+        AuthTokenResponse response = authService.superAdminLogin(request);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/dashboard")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Super Admin platform command metrics, MRR, and platform distribution")
     public ResponseEntity<ApiResponse<SuperAdminDashboardDto>> getDashboard() {
         SuperAdminDashboardDto dashboard = dashboardService.getSuperAdminDashboard();
         return ResponseEntity.ok(ApiResponse.ok("Platform metrics retrieved successfully", dashboard));
     }
 
+
     @GetMapping("/companies")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Get paginated, searchable companies list")
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompanies(
             @RequestParam(defaultValue = "0") int page,
@@ -75,6 +96,7 @@ public class SuperAdminController {
     }
 
     @GetMapping("/companies/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Get company details by ID")
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompanyById(@PathVariable String id) {
         CompanyResponse res = companyService.getCompanyById(id);
@@ -82,6 +104,7 @@ public class SuperAdminController {
     }
 
     @PostMapping("/companies")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Provision a new tenant company workspace")
     public ResponseEntity<ApiResponse<CompanyResponse>> createCompany(@Valid @RequestBody CompanyRequest request) {
         CompanyResponse created = companyService.createCompany(request);
@@ -90,6 +113,7 @@ public class SuperAdminController {
     }
 
     @PutMapping("/companies/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Update tenant company configuration")
     public ResponseEntity<ApiResponse<CompanyResponse>> updateCompany(@PathVariable String id, @RequestBody CompanyRequest request) {
         CompanyResponse updated = companyService.updateCompany(id, request);
@@ -97,6 +121,7 @@ public class SuperAdminController {
     }
 
     @DeleteMapping("/companies/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Soft-delete or suspend tenant company")
     public ResponseEntity<ApiResponse<Void>> deleteCompany(@PathVariable String id) {
         companyService.deleteOrDeactivateCompany(id);
@@ -104,6 +129,7 @@ public class SuperAdminController {
     }
 
     @GetMapping("/subscriptions")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "View all active/expired subscriptions across platform")
     public ResponseEntity<ApiResponse<List<SubscriptionDto>>> getSubscriptions(
             @RequestParam(defaultValue = "0") int page,
@@ -115,6 +141,7 @@ public class SuperAdminController {
     }
 
     @GetMapping("/subscriptions/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Get subscription by ID")
     public ResponseEntity<ApiResponse<SubscriptionDto>> getSubscriptionById(@PathVariable String id) {
         SubscriptionDto dto = subscriptionService.getSubscriptionById(id);
@@ -122,6 +149,7 @@ public class SuperAdminController {
     }
 
     @PutMapping("/subscriptions/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Update company subscription terms")
     public ResponseEntity<ApiResponse<SubscriptionDto>> updateSubscription(@PathVariable String id, @RequestBody SubscriptionDto request) {
         SubscriptionDto updated = subscriptionService.updateSubscription(id, request);
