@@ -1,20 +1,36 @@
-import React, { createContext, useContext, useState } from 'react';
-import { initialCompanies } from '../data/companies';
-import { initialSubscriptions, subscriptionPlans } from '../data/subscriptions';
-import { superAdminStats, revenueMonthlyData, subscriptionDistribution, platformRecentActivities } from '../data/dashboard';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { companyApi } from '../api/companyApi';
+import { subscriptionApi } from '../api/subscriptionApi';
+import { dashboardApi } from '../api/dashboardApi';
+import { userApi } from '../api/userApi';
+import { useAuth } from './AuthContext';
+import { revenueMonthlyData as defaultRevenueData, subscriptionDistribution as defaultSubDistribution, platformRecentActivities as defaultActivities } from '../data/dashboard';
 
 const SuperAdminContext = createContext(null);
 
 export function SuperAdminProvider({ children }) {
-  const [companies, setCompanies] = useState(initialCompanies);
-  const [subscriptions, setSubscriptions] = useState(initialSubscriptions);
-  const [plans, setPlans] = useState(subscriptionPlans);
-  const [activities, setActivities] = useState(platformRecentActivities);
+  const { role } = useAuth();
+  const [companies, setCompanies] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [plans, setPlans] = useState([]);
+  const [activities, setActivities] = useState(defaultActivities);
+  const [stats, setStats] = useState({
+    totalCompanies: { value: '0', growth: '+0%', trend: 'up' },
+    activeCompanies: { value: '0', growth: '+0%', trend: 'up' },
+    totalUsers: { value: '0', growth: '+0%', trend: 'up' },
+    activeSubscriptions: { value: '0', growth: '+0%', trend: 'up' },
+    monthlyRevenue: { value: '₹0', growth: '+0%', trend: 'up' },
+    avgSubscriptionValue: { value: '₹0', growth: '+0%', trend: 'up' }
+  });
+  const [revenueMonthlyData, setRevenueMonthlyData] = useState(defaultRevenueData);
+  const [subscriptionDistribution, setSubscriptionDistribution] = useState(defaultSubDistribution);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // General Settings state
   const [generalSettings, setGeneralSettings] = useState({
     platformName: 'NEXORA CRM',
-    platformEmail: 'support@nexoracrm.com',
+    platformEmail: 'support@nexora.app',
     supportPhone: '+91 98765 00000',
     defaultCurrency: 'INR - ₹',
     defaultTimezone: 'Asia/Kolkata',
@@ -25,7 +41,7 @@ export function SuperAdminProvider({ children }) {
   // Profile Settings state
   const [profileSettings, setProfileSettings] = useState({
     fullName: 'Super Admin',
-    email: 'admin@nexoracrm.com',
+    email: 'superadmin@nexora.app',
     phone: '+91 98765 43210',
     userId: 'superadmin',
     avatarUrl: null
@@ -36,8 +52,7 @@ export function SuperAdminProvider({ children }) {
     twoFactorEnabled: true,
     loginActivity: [
       { id: 1, device: 'Chrome — Windows 11', location: 'Bengaluru, India', lastActive: 'Active now', current: true },
-      { id: 2, device: 'Edge — Windows 11', location: 'Bengaluru, India', lastActive: '2 days ago', current: false },
-      { id: 3, device: 'Mobile Chrome — Android 14', location: 'Mumbai, India', lastActive: '5 days ago', current: false }
+      { id: 2, device: 'Edge — Windows 11', location: 'Bengaluru, India', lastActive: '2 days ago', current: false }
     ]
   });
 
@@ -60,101 +75,94 @@ export function SuperAdminProvider({ children }) {
     collapsedSidebar: false
   });
 
-  // Actions
-  const addCompany = (newCompanyData) => {
-    const id = `cmp-${Date.now()}`;
-    const initials = newCompanyData.name
-      .split(' ')
-      .slice(0, 2)
-      .map(w => w[0])
-      .join('')
-      .toUpperCase();
+  // Fetch Super Admin platform data from Backend
+  const refreshSuperAdminData = useCallback(async () => {
+    if (role !== 'super_admin') return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [dashRes, compRes, subsRes, plansRes] = await Promise.all([
+        dashboardApi.getSuperAdminDashboard().catch(() => null),
+        companyApi.getCompanies({ page: 0, size: 100 }).catch(() => null),
+        subscriptionApi.getAllSubscriptions().catch(() => null),
+        subscriptionApi.getPlans().catch(() => null)
+      ]);
 
-    const planPrices = {
-      Starter: '₹999 / mo',
-      Growth: '₹2,499 / mo',
-      Scale: '₹5,999 / mo'
-    };
+      if (dashRes) {
+        if (dashRes.stats) setStats(dashRes.stats);
+        if (dashRes.revenueMonthlyData) setRevenueMonthlyData(dashRes.revenueMonthlyData);
+        if (dashRes.subscriptionDistribution) setSubscriptionDistribution(dashRes.subscriptionDistribution);
+        if (dashRes.platformRecentActivities) setActivities(dashRes.platformRecentActivities);
+      }
 
-    const newCompany = {
-      id,
+      if (compRes?.data) {
+        setCompanies(compRes.data);
+      }
+
+      if (subsRes?.data) {
+        setSubscriptions(subsRes.data);
+      }
+
+      if (plansRes && Array.isArray(plansRes)) {
+        setPlans(plansRes);
+      }
+    } catch (err) {
+      console.error('Failed to load super admin data from API:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [role]);
+
+  useEffect(() => {
+    if (role === 'super_admin') {
+      refreshSuperAdminData();
+    }
+  }, [role, refreshSuperAdminData]);
+
+  // Actions connecting to real backend API
+  const addCompany = async (newCompanyData) => {
+    const payload = {
       name: newCompanyData.name,
-      logo: initials || 'CO',
-      logoColor: 'var(--tertiary)',
-      domain: `${newCompanyData.name.toLowerCase().replace(/[^a-z0-9]/g, '')}.nexora.app`,
       email: newCompanyData.email,
       phone: newCompanyData.phone,
-      address: newCompanyData.address || 'Address not specified',
-      owner: {
-        name: newCompanyData.adminName,
-        email: newCompanyData.adminEmail,
-        avatar: newCompanyData.adminName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AD'
-      },
+      address: newCompanyData.address,
       plan: newCompanyData.plan || 'Growth',
       billingCycle: newCompanyData.billingCycle || 'Monthly',
-      price: planPrices[newCompanyData.plan] || '₹2,499 / mo',
-      usersCount: 1,
-      userLimit: Number(newCompanyData.userLimit) || (newCompanyData.plan === 'Starter' ? 5 : newCompanyData.plan === 'Growth' ? 20 : 100),
-      status: newCompanyData.status || 'Active',
-      joinedDate: 'Just now',
-      renewalDate: 'Next month',
-      metrics: {
-        activeUsers: 1,
-        storageUsed: '0.1 GB / 50 GB',
-        leads: 0,
-        customers: 0,
-        deals: 0
-      },
-      recentActivity: [
-        { id: 1, action: 'Organization provisioned by Super Admin', timestamp: 'Just now', user: 'Super Admin' }
-      ]
+      userLimit: Number(newCompanyData.userLimit) || 20,
+      adminName: newCompanyData.adminName || `${newCompanyData.name} Admin`,
+      adminEmail: newCompanyData.adminEmail || newCompanyData.email
     };
 
-    setCompanies(prev => [newCompany, ...prev]);
-
-    // Also add to mock subscriptions table
-    const newSub = {
-      id: `sub-${Date.now()}`,
-      companyId: id,
-      companyName: newCompany.name,
-      plan: newCompany.plan,
-      billingCycle: newCompany.billingCycle,
-      amount: newCompany.price.split(' ')[0],
-      status: newCompany.status,
-      startDate: 'Today',
-      renewalDate: newCompany.renewalDate,
-      autoRenew: true
-    };
-    setSubscriptions(prev => [newSub, ...prev]);
-
-    // Add activity
-    setActivities(prev => [
-      {
-        id: Date.now(),
-        title: 'New Company Onboarded',
-        detail: `${newCompany.name} created on ${newCompany.plan} plan (${newCompany.status})`,
-        time: 'Just now',
-        type: 'company',
-        iconColor: 'var(--tertiary)'
-      },
-      ...prev
-    ]);
-
-    return newCompany;
+    const created = await companyApi.createCompany(payload);
+    await refreshSuperAdminData();
+    return created;
   };
 
-  const updateCompanyStatus = (companyId, newStatus) => {
-    setCompanies(prev =>
-      prev.map(c => (c.id === companyId ? { ...c, status: newStatus } : c))
-    );
-    setSubscriptions(prev =>
-      prev.map(s => (s.companyId === companyId ? { ...s, status: newStatus } : s))
-    );
+  const updateCompanyStatus = async (companyId, newStatus) => {
+    await companyApi.updateCompany(companyId, { status: newStatus });
+    await refreshSuperAdminData();
   };
 
-  const deleteCompany = (companyId) => {
-    setCompanies(prev => prev.filter(c => c.id !== companyId));
-    setSubscriptions(prev => prev.filter(s => s.companyId !== companyId));
+  const deleteCompany = async (companyId) => {
+    await companyApi.deleteCompany(companyId);
+    await refreshSuperAdminData();
+  };
+
+  // Profile and Password persistence
+  const saveProfileSettings = async (profileData) => {
+    const res = await userApi.updateProfile({
+      name: profileData.fullName,
+      phone: profileData.phone,
+      email: profileData.email
+    });
+    setProfileSettings(prev => ({
+      ...prev,
+      fullName: res.name || res.fullName || prev.fullName,
+      phone: res.phone || prev.phone,
+      email: res.email || prev.email
+    }));
+    return res;
   };
 
   return (
@@ -164,13 +172,17 @@ export function SuperAdminProvider({ children }) {
         subscriptions,
         plans,
         activities,
-        stats: superAdminStats,
+        stats,
         revenueMonthlyData,
         subscriptionDistribution,
+        loading,
+        error,
+        refreshSuperAdminData,
         generalSettings,
         setGeneralSettings,
         profileSettings,
         setProfileSettings,
+        saveProfileSettings,
         securitySettings,
         setSecuritySettings,
         notificationSettings,

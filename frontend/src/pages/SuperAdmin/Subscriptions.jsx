@@ -167,7 +167,7 @@ export default function SubscriptionsPage() {
                 </div>
 
                 <ul className="sa-plan-feature-list">
-                  {plan.features.map((feat, idx) => (
+                  {(plan.features || []).map((feat, idx) => (
                     <li key={idx} className="sa-plan-feature-item">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <polyline points="20 6 9 17 4 12" />
@@ -179,8 +179,8 @@ export default function SubscriptionsPage() {
 
                 <div className="sa-plan-card-footer">
                   <div className="sa-plan-stats font-mono">
-                    <span>{plan.stats.activeCompanies} Companies</span>
-                    <span>{plan.stats.mrrContribution} MRR</span>
+                    <span>{plan.stats?.activeCompanies ?? '—'} Companies</span>
+                    <span>{plan.stats?.mrrContribution ?? '—'} MRR</span>
                   </div>
                   <button
                     type="button"
@@ -426,7 +426,7 @@ export default function SubscriptionsPage() {
                 <textarea
                   className="form-input font-mono"
                   rows="4"
-                  defaultValue={selectedPlanModal.features.join('\n')}
+                  defaultValue={(selectedPlanModal.features || []).join('\n')}
                 />
               </div>
             </div>
