@@ -14,7 +14,7 @@ public class PlatformSetting {
     @Column(name = "setting_key", unique = true, nullable = false, length = 100)
     private String settingKey;
 
-    @Column(name = "setting_value", columnDefinition = "TEXT")
+    @Column(name = "setting_value", columnDefinition = "LONGTEXT")
     private String settingValue;
 
     @Column(name = "updated_at", nullable = false)

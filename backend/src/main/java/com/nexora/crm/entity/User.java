@@ -31,6 +31,7 @@ public class User {
     @JoinColumn(name = "company_id")
     private Company company;
 
+    @Column(columnDefinition = "LONGTEXT")
     private String avatar;
     private String department;
     private String phone;

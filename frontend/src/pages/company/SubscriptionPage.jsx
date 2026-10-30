@@ -9,7 +9,7 @@ export default function SubscriptionPage() {
     name: user?.companyName || 'Acme Corporation',
     plan: 'Growth',
     billingCycle: 'Monthly',
-    price: '₹2,499 / mo',
+    price: '₹2,499',
     status: 'Active',
     renewalDate: 'Nov 24, 2026',
     maxUsers: 20
@@ -33,7 +33,7 @@ export default function SubscriptionPage() {
           <div className="company-sub-card">
             <div className="sub-tier-row">
               <span className="sub-plan-badge font-mono">{company.plan.toUpperCase()} PLAN</span>
-              <span className="font-mono text-tertiary font-bold">{company.price}</span>
+              <span className="font-mono text-tertiary font-bold">{company.price ? company.price.replace(/\s*\/\s*(mo|yr|month|year|monthly)/i, '') : '—'}</span>
             </div>
             <div className="sub-pricing-row">
               <span className="sub-amount font-mono">Billing: {company.billingCycle}</span>

@@ -5,7 +5,7 @@ import AdminLayout from '../../components/SuperAdmin/AdminLayout';
 
 export default function AddCompany() {
   const navigate = useNavigate();
-  const { addCompany } = useSuperAdmin();
+  const { addCompany, plans } = useSuperAdmin();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -14,12 +14,16 @@ export default function AddCompany() {
     address: '',
     adminName: '',
     adminEmail: '',
+    adminPassword: '',
+    confirmPassword: '',
     userLimit: 20,
-    plan: 'Growth',
+    plan: plans && plans.length > 0 ? plans[0].name : 'Growth',
     billingCycle: 'Monthly',
-    status: 'Active',
-    trialPeriod: '14 Days'
+    status: 'Active'
   });
+
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState(null);
@@ -28,9 +32,20 @@ export default function AddCompany() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'plan') {
+      const selectedPlanObj = plans.find(p => p.name?.toLowerCase() === value?.toLowerCase());
+      const newLimit = selectedPlanObj?.userLimit || 20;
+      setFormData((prev) => ({ ...prev, plan: value, userLimit: newLimit }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
+    }
+    if (name === 'adminPassword' || name === 'confirmPassword') {
+      if (errors.confirmPassword) {
+        setErrors((prev) => ({ ...prev, confirmPassword: null }));
+      }
     }
     if (serverError) {
       setServerError(null);
@@ -48,11 +63,30 @@ export default function AddCompany() {
     if (!formData.phone.trim()) {
       errs.phone = 'Company Phone is required.';
     }
-    if (formData.adminEmail && formData.adminEmail.trim()) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail.trim())) {
-        errs.adminEmail = 'Please provide a valid admin email address.';
-      }
+
+    // Company Administrator validation
+    if (!formData.adminName.trim()) {
+      errs.adminName = 'Administrator Name is required.';
     }
+
+    if (!formData.adminEmail.trim()) {
+      errs.adminEmail = 'Administrator Email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail.trim())) {
+      errs.adminEmail = 'Please provide a valid administrator email address.';
+    }
+
+    if (!formData.adminPassword) {
+      errs.adminPassword = 'Administrator Password is required.';
+    } else if (formData.adminPassword.length < 6) {
+      errs.adminPassword = 'Password must be at least 6 characters.';
+    }
+
+    if (!formData.confirmPassword) {
+      errs.confirmPassword = 'Confirm Password is required.';
+    } else if (formData.adminPassword !== formData.confirmPassword) {
+      errs.confirmPassword = 'Passwords do not match.';
+    }
+
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -66,9 +100,9 @@ export default function AddCompany() {
 
     try {
       const planPrices = {
-        Starter: '₹999 / mo',
-        Growth: '₹2,499 / mo',
-        Scale: '₹5,999 / mo'
+        Starter: '₹999',
+        Growth: '₹2,499',
+        Scale: '₹5,999'
       };
 
       const payload = {
@@ -78,11 +112,12 @@ export default function AddCompany() {
         address: formData.address ? formData.address.trim() : null,
         plan: formData.plan,
         billingCycle: formData.billingCycle,
-        price: planPrices[formData.plan] || '₹2,499 / mo',
+        price: planPrices[formData.plan] || '₹2,499',
         userLimit: Number(formData.userLimit) || 20,
         status: formData.status,
-        adminName: formData.adminName ? formData.adminName.trim() : `${formData.name.trim()} Admin`,
-        adminEmail: formData.adminEmail ? formData.adminEmail.trim() : formData.email.trim()
+        adminName: formData.adminName.trim(),
+        adminEmail: formData.adminEmail.trim(),
+        adminPassword: formData.adminPassword
       };
 
       const created = await addCompany(payload);
@@ -282,7 +317,7 @@ export default function AddCompany() {
               {/* Admin Name */}
               <div className="form-group">
                 <label htmlFor="adminName" className="form-label">
-                  <span>Admin Name</span>
+                  <span>Administrator Name <span className="text-danger">*</span></span>
                 </label>
                 <div className="sa-input-wrapper">
                   <span className="sa-input-icon" aria-hidden="true">
@@ -295,18 +330,20 @@ export default function AddCompany() {
                     id="adminName"
                     type="text"
                     name="adminName"
-                    className="form-input font-mono sa-input-with-icon"
+                    className={`form-input font-mono sa-input-with-icon ${errors.adminName ? 'input-error' : ''}`}
                     placeholder="e.g. Rahul Sharma"
                     value={formData.adminName}
                     onChange={handleChange}
+                    required
                   />
                 </div>
+                {errors.adminName && <span className="field-error font-mono">{errors.adminName}</span>}
               </div>
 
               {/* Admin Email */}
               <div className="form-group">
                 <label htmlFor="adminEmail" className="form-label">
-                  <span>Admin Email</span>
+                  <span>Administrator Email <span className="text-danger">*</span></span>
                 </label>
                 <div className="sa-input-wrapper">
                   <span className="sa-input-icon" aria-hidden="true">
@@ -323,9 +360,102 @@ export default function AddCompany() {
                     placeholder="admin@apexdynamics.io"
                     value={formData.adminEmail}
                     onChange={handleChange}
+                    required
                   />
                 </div>
                 {errors.adminEmail && <span className="field-error font-mono">{errors.adminEmail}</span>}
+              </div>
+
+              {/* Admin Password */}
+              <div className="form-group">
+                <label htmlFor="adminPassword" className="form-label">
+                  <span>Administrator Password <span className="text-danger">*</span></span>
+                </label>
+                <div className="sa-input-wrapper password-input-wrap">
+                  <span className="sa-input-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                  </span>
+                  <input
+                    id="adminPassword"
+                    type={showAdminPassword ? 'text' : 'password'}
+                    name="adminPassword"
+                    className={`form-input font-mono sa-input-with-icon ${errors.adminPassword ? 'input-error' : ''}`}
+                    placeholder="Enter password (min. 6 characters)"
+                    value={formData.adminPassword}
+                    onChange={handleChange}
+                    autoComplete="new-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowAdminPassword(!showAdminPassword)}
+                    aria-label={showAdminPassword ? 'Hide administrator password' : 'Show administrator password'}
+                    title={showAdminPassword ? 'Hide administrator password' : 'Show administrator password'}
+                  >
+                    {showAdminPassword ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {errors.adminPassword && <span className="field-error font-mono">{errors.adminPassword}</span>}
+              </div>
+
+              {/* Confirm Password */}
+              <div className="form-group">
+                <label htmlFor="confirmPassword" className="form-label">
+                  <span>Confirm Password <span className="text-danger">*</span></span>
+                </label>
+                <div className="sa-input-wrapper password-input-wrap">
+                  <span className="sa-input-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                  </span>
+                  <input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    name="confirmPassword"
+                    className={`form-input font-mono sa-input-with-icon ${errors.confirmPassword ? 'input-error' : ''}`}
+                    placeholder="Re-enter administrator password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    autoComplete="new-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    title={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                  >
+                    {showConfirmPassword ? (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                      </svg>
+                    ) : (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                {errors.confirmPassword && <span className="field-error font-mono">{errors.confirmPassword}</span>}
               </div>
             </div>
           </section>
@@ -358,9 +488,19 @@ export default function AddCompany() {
                   value={formData.plan}
                   onChange={handleChange}
                 >
-                  <option value="Starter">Starter (5 Seats — ₹999/mo)</option>
-                  <option value="Growth">Growth (20 Seats — ₹2,499/mo)</option>
-                  <option value="Scale">Scale (Unlimited Seats — ₹5,999/mo)</option>
+                  {plans && plans.length > 0 ? (
+                    plans.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name} ({p.userLimit} Seats — ₹{p.monthlyPrice})
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Starter">Starter (5 Seats — ₹999)</option>
+                      <option value="Growth">Growth (20 Seats — ₹2,499)</option>
+                      <option value="Scale">Scale (50 Seats — ₹5,999)</option>
+                    </>
+                  )}
                 </select>
               </div>
 
@@ -414,25 +554,6 @@ export default function AddCompany() {
                   <option value="Active">Active</option>
                   <option value="Pending">Pending</option>
                   <option value="Suspended">Suspended</option>
-                </select>
-              </div>
-
-              {/* Trial Period */}
-              <div className="form-group sa-form-grid-full">
-                <label htmlFor="trialPeriod" className="form-label">
-                  <span>Trial Period</span>
-                </label>
-                <select
-                  id="trialPeriod"
-                  name="trialPeriod"
-                  className="form-input font-mono"
-                  value={formData.trialPeriod}
-                  onChange={handleChange}
-                >
-                  <option value="None">None (Direct Activation)</option>
-                  <option value="7 Days">7 Days Free Trial</option>
-                  <option value="14 Days">14 Days Free Trial</option>
-                  <option value="30 Days">30 Days Free Trial</option>
                 </select>
               </div>
             </div>

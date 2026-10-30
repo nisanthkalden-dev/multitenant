@@ -39,6 +39,13 @@ public class UserProfileController {
         return ResponseEntity.ok(ApiResponse.ok("Profile updated successfully", updated));
     }
 
+    @DeleteMapping("/avatar")
+    @Operation(summary = "Remove current user profile picture")
+    public ResponseEntity<ApiResponse<UserSummaryDto>> removeAvatar() {
+        UserSummaryDto updated = userService.removeCurrentUserAvatar();
+        return ResponseEntity.ok(ApiResponse.ok("Profile picture removed successfully", updated));
+    }
+
     @PutMapping("/password")
     @Operation(summary = "Change current user password")
     public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody PasswordChangeRequest request) {

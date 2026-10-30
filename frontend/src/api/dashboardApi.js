@@ -1,8 +1,8 @@
 import { apiClient } from './apiClient';
 
 export const dashboardApi = {
-  getSuperAdminDashboard: async () => {
-    const res = await apiClient('/super-admin/dashboard');
+  getSuperAdminDashboard: async (period = '6M') => {
+    const res = await apiClient(`/super-admin/dashboard?period=${encodeURIComponent(period)}`);
     return res.data;
   },
 

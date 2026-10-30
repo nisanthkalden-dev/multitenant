@@ -23,10 +23,17 @@ public class CompanyRequest {
     private Integer userLimit = 20;
     private String status = "Active";
 
-    // Optional initial administrator credentials
+    // Company Administrator credentials
+    @NotBlank(message = "Administrator Name is required")
     private String adminName;
+
+    @NotBlank(message = "Administrator Email is required")
+    @Email(message = "Please provide a valid administrator email")
     private String adminEmail;
+
     private String adminUserId;
+
+    @NotBlank(message = "Administrator Password is required")
     private String adminPassword;
 
     public CompanyRequest() {}
