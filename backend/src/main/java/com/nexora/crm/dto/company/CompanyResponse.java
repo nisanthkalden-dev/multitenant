@@ -188,16 +188,26 @@ public class CompanyResponse {
     }
 
     public static class CompanyOwnerDto {
+        private String userId;
         private String name;
         private String email;
         private String avatar;
 
         public CompanyOwnerDto() {}
 
-        public CompanyOwnerDto(String name, String email, String avatar) {
+        public CompanyOwnerDto(String userId, String name, String email, String avatar) {
+            this.userId = userId;
             this.name = name;
             this.email = email;
             this.avatar = avatar;
+        }
+
+        public String getUserId() {
+            return userId;
+        }
+
+        public void setUserId(String userId) {
+            this.userId = userId;
         }
 
         public String getName() {

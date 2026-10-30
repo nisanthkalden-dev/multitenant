@@ -96,14 +96,29 @@ public class SubscriptionService {
         sub.setBillingCycle(request.getBillingCycle() != null ? request.getBillingCycle() : "Monthly");
         sub.setAmount(CompanyService.cleanPrice(request.getAmount() != null ? request.getAmount() : "₹2,499"));
         sub.setStatus("Active");
-        sub.setStartDate("Today");
-        sub.setRenewalDate("Nov 24, 2026");
+        java.time.LocalDate startDate = java.time.LocalDate.now();
+        java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("MMM dd, yyyy", java.util.Locale.ENGLISH);
+        sub.setStartDate(startDate.format(dtf));
+
+        // Calculate next renewal date based on billing cycle
+        java.time.LocalDate renewal;
+        if ("Annual".equalsIgnoreCase(sub.getBillingCycle())) {
+            renewal = startDate.plusYears(1);
+        } else if ("Quarterly".equalsIgnoreCase(sub.getBillingCycle())) {
+            renewal = startDate.plusMonths(3);
+        } else {
+            renewal = startDate.plusMonths(1);
+        }
+        sub.setRenewalDate(renewal.format(dtf));
         sub.setAutoRenew(request.getAutoRenew() != null ? request.getAutoRenew() : true);
 
-        // Update company profile accordingly
+        // Update company profile accordingly and restore Active status upon successful payment/renewal
         company.setPlan(sub.getPlanName());
         company.setBillingCycle(sub.getBillingCycle());
         company.setPrice(CompanyService.cleanPrice(sub.getAmount()));
+        company.setRenewalDate(sub.getRenewalDate());
+        company.setStatus("Active");
+        company.setIsActive(true);
         companyRepository.save(company);
 
         Subscription saved = subscriptionRepository.save(sub);

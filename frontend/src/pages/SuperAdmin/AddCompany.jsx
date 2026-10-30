@@ -580,7 +580,7 @@ export default function AddCompany() {
               {isSubmitting ? (
                 <span className="btn-loading-wrap">
                   <span className="spinner-dot"></span>
-                  <span>Saving to MySQL...</span>
+                  <span>Company Added Successfully...</span>
                 </span>
               ) : (
                 'Create Company'

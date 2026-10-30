@@ -74,6 +74,7 @@ D:\multitenant\backend\src\main\java\com\nexora\crm\repository\SubscriptionPlanR
 D:\multitenant\backend\src\main\java\com\nexora\crm\repository\SubscriptionRepository.java
 D:\multitenant\backend\src\main\java\com\nexora\crm\repository\TaskRepository.java
 D:\multitenant\backend\src\main\java\com\nexora\crm\repository\UserRepository.java
+D:\multitenant\backend\src\main\java\com\nexora\crm\scheduler\SubscriptionLifecycleScheduler.java
 D:\multitenant\backend\src\main\java\com\nexora\crm\security\CustomUserDetails.java
 D:\multitenant\backend\src\main\java\com\nexora\crm\security\CustomUserDetailsService.java
 D:\multitenant\backend\src\main\java\com\nexora\crm\security\JwtAccessDeniedHandler.java
