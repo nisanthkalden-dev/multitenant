@@ -123,7 +123,9 @@ public class CompanyService {
             company.setUserLimit(request.getUserLimit() != null ? request.getUserLimit() : 20);
             company.setPrice(cleanPrice(request.getPrice()));
         }
-        company.setStatus(request.getStatus() != null ? request.getStatus() : "Active");
+        String initialStatus = request.getStatus() != null ? request.getStatus() : "Active";
+        company.setStatus(initialStatus);
+        company.setIsActive("Active".equalsIgnoreCase(initialStatus));
 
         String domainClean = request.getName().toLowerCase().replaceAll("[^a-z0-9]", "");
         if (domainClean.isBlank()) {
@@ -294,20 +296,22 @@ public class CompanyService {
                 .orElse(users.isEmpty() ? null : users.get(0));
 
         if (owner != null) {
-            res.setOwner(new CompanyResponse.CompanyOwnerDto(owner.getFullName(), owner.getEmail(), owner.getAvatar()));
+            res.setOwner(new CompanyResponse.CompanyOwnerDto(owner.getUserId(), owner.getFullName(), owner.getEmail(), owner.getAvatar()));
         } else {
-            res.setOwner(new CompanyResponse.CompanyOwnerDto(company.getName() + " Admin", company.getEmail(), company.getLogo()));
+            res.setOwner(new CompanyResponse.CompanyOwnerDto(null, company.getName() + " Admin", company.getEmail(), company.getLogo()));
         }
 
-        // Metrics
+        // Metrics - Strictly Real Scoped Counts
         long customerCount = customerRepository.countByCompany_Id(company.getId());
         long leadCount = leadRepository.countByCompany_Id(company.getId());
         Map<String, Object> metrics = new HashMap<>();
-        metrics.put("activeUsers", users.size());
         metrics.put("customers", customerCount);
         metrics.put("leads", leadCount);
-        metrics.put("deals", Math.round(leadCount * 0.6));
-        metrics.put("storageUsed", (users.size() * 1.5) + " GB / 100 GB");
+        // Note: Real session tracking, storage disk quota measurement, and deals tables do not exist in the database.
+        // We explicitly set them to null so frontend knows they are untracked rather than fabricating values.
+        metrics.put("activeUsers", null);
+        metrics.put("deals", null);
+        metrics.put("storageUsed", null);
         res.setMetrics(metrics);
 
         // Recent activity

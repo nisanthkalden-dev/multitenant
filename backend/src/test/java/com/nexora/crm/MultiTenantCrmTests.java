@@ -859,4 +859,118 @@ public class MultiTenantCrmTests {
         // Confirm users of COMP001 still exist
         org.junit.jupiter.api.Assertions.assertTrue(userRepository.countByCompany_Id("COMP001") > 0);
     }
+
+    @Test
+    @DisplayName("End-to-End: Super Admin Creates Company -> Company Admin Logs In -> Receives JWT -> Accesses Dashboard")
+    public void testAddCompanyAndCompanyAdminLoginFlow() throws Exception {
+        SuperAdminLoginRequest saLogin = new SuperAdminLoginRequest("superadmin@nexora.com", "SuperAdmin123!");
+        MvcResult saLoginRes = mockMvc.perform(post("/api/super-admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(saLogin)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String saToken = objectMapper.readTree(saLoginRes.getResponse().getContentAsString()).path("accessToken").asText();
+
+        String suffix = String.valueOf(System.currentTimeMillis());
+        String companyName = "Test Corporation " + suffix;
+        String companyEmail = "contact_" + suffix + "@testcorp.com";
+        String adminEmail = "admin_" + suffix + "@testcorp.com";
+        String adminPass = "SecureAdminPass123!";
+
+        com.nexora.crm.dto.company.CompanyRequest createReq = new com.nexora.crm.dto.company.CompanyRequest();
+        createReq.setName(companyName);
+        createReq.setEmail(companyEmail);
+        createReq.setPhone("9876543210");
+        createReq.setAddress("123 Tech Park");
+        createReq.setPlan("Growth");
+        createReq.setBillingCycle("Monthly");
+        createReq.setPrice("₹2,499");
+        createReq.setUserLimit(25);
+        createReq.setStatus("Active");
+        createReq.setAdminName("Test Admin " + suffix);
+        createReq.setAdminEmail(adminEmail);
+        createReq.setAdminPassword(adminPass);
+
+        // 1. Super Admin provisions company
+        MvcResult createResult = mockMvc.perform(post("/api/super-admin/companies")
+                        .header("Authorization", "Bearer " + saToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.id", notNullValue()))
+                .andExpect(jsonPath("$.data.owner.email", is(adminEmail)))
+                .andExpect(jsonPath("$.data.owner.userId", notNullValue()))
+                .andReturn();
+
+        String createdJson = createResult.getResponse().getContentAsString();
+        String createdCompanyId = objectMapper.readTree(createdJson).path("data").path("id").asText();
+        String createdAdminUserId = objectMapper.readTree(createdJson).path("data").path("owner").path("userId").asText();
+
+        // 2. Verify in MySQL database: company active, user active, BCrypt hashed password
+        com.nexora.crm.entity.Company dbCompany = companyRepository.findById(createdCompanyId).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(dbCompany.getIsActive(), "Company isActive must be true");
+        org.junit.jupiter.api.Assertions.assertEquals("Active", dbCompany.getStatus());
+
+        com.nexora.crm.entity.User dbUser = userRepository.findByEmailIgnoreCase(adminEmail).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(dbUser.getIsActive(), "Admin user isActive must be true");
+        org.junit.jupiter.api.Assertions.assertEquals(com.nexora.crm.entity.RoleType.COMPANY_ADMIN, dbUser.getRole());
+        org.junit.jupiter.api.Assertions.assertEquals(createdCompanyId, dbUser.getCompany().getId());
+        org.junit.jupiter.api.Assertions.assertTrue(dbUser.getPasswordHash().startsWith("$2a$"), "Password must be BCrypt hashed");
+        org.junit.jupiter.api.Assertions.assertNotEquals(adminPass, dbUser.getPasswordHash(), "Password must never be plain text");
+
+        // 3. Test Login via Admin Email (standard company login flow)
+        LoginRequest loginByEmail = new LoginRequest();
+        loginByEmail.setUserId(adminEmail);
+        loginByEmail.setPassword(adminPass);
+        loginByEmail.setLoginType("company");
+
+        MvcResult loginEmailRes = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginByEmail)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.accessToken", notNullValue()))
+                .andExpect(jsonPath("$.data.user.role", is("company_admin")))
+                .andExpect(jsonPath("$.data.user.companyId", is(createdCompanyId)))
+                .andReturn();
+
+        String token = objectMapper.readTree(loginEmailRes.getResponse().getContentAsString())
+                .path("data").path("accessToken").asText();
+
+        // 4. Test Login via Admin User ID
+        LoginRequest loginByUserId = new LoginRequest();
+        loginByUserId.setUserId(createdAdminUserId);
+        loginByUserId.setPassword(adminPass);
+        loginByUserId.setLoginType("company");
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginByUserId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.accessToken", notNullValue()));
+
+        // 5. Test Access to Protected Dashboard with Admin JWT
+        mockMvc.perform(get("/api/auth/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.email", is(adminEmail)))
+                .andExpect(jsonPath("$.data.companyId", is(createdCompanyId)));
+
+        // 6. Test Super Admin Suspends Company -> Admin can no longer log in
+        com.nexora.crm.dto.company.CompanyRequest suspendReq = new com.nexora.crm.dto.company.CompanyRequest();
+        suspendReq.setStatus("Suspended");
+        mockMvc.perform(put("/api/super-admin/companies/" + createdCompanyId)
+                        .header("Authorization", "Bearer " + saToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(suspendReq)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginByEmail)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message", containsString("Your company account is suspended")));
+    }
 }

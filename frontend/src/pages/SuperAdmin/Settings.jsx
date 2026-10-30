@@ -105,9 +105,9 @@ export default function SuperAdminSettings() {
       } else {
         setGeneralSettings(generalForm);
       }
-      showSaveSuccess('General platform settings saved successfully to MySQL database!');
+      showSaveSuccess('General platform settings saved successfully !');
     } catch (err) {
-      showSaveError(err.message || 'Failed to save settings to database');
+      showSaveError(err.message || 'Failed to save');
     } finally {
       setIsSavingGeneral(false);
     }
@@ -142,12 +142,12 @@ export default function SuperAdminSettings() {
           }
           localStorage.setItem('nexora_auth_session', JSON.stringify(session));
         }
-      } catch (ignored) {}
+      } catch (ignored) { }
 
       if (refreshAll) {
         await refreshAll();
       }
-      showSaveSuccess('Super Admin profile and photo updated and saved in MySQL database!');
+      showSaveSuccess('Super Admin profile and photo updated and saved !');
     } catch (err) {
       showSaveError(err.message || 'Failed to update profile in database');
     } finally {
@@ -174,13 +174,13 @@ export default function SuperAdminSettings() {
           }
           localStorage.setItem('nexora_auth_session', JSON.stringify(session));
         }
-      } catch (ignored) {}
+      } catch (ignored) { }
 
       if (refreshAll) {
         await refreshAll();
       }
       setShowConfirmRemoveAvatar(false);
-      showSaveSuccess('Profile picture removed successfully from MySQL database!');
+      showSaveSuccess('Profile picture removed successfully !');
     } catch (err) {
       showSaveError(err.message || 'Failed to remove profile picture');
     } finally {
@@ -203,7 +203,7 @@ export default function SuperAdminSettings() {
         await refreshAll();
       }
       setShowConfirmRemoveLogo(false);
-      showSaveSuccess('Platform brand logo removed successfully from MySQL database!');
+      showSaveSuccess('Platform brand logo removed successfully!');
     } catch (err) {
       showSaveError(err.message || 'Failed to remove brand logo');
     } finally {
@@ -526,11 +526,11 @@ export default function SuperAdminSettings() {
                     <span>
                       {profileForm.fullName
                         ? profileForm.fullName
-                            .split(' ')
-                            .slice(0, 2)
-                            .map((n) => n[0])
-                            .join('')
-                            .toUpperCase() || 'SA'
+                          .split(' ')
+                          .slice(0, 2)
+                          .map((n) => n[0])
+                          .join('')
+                          .toUpperCase() || 'SA'
                         : 'SA'}
                     </span>
                   )}
@@ -745,15 +745,15 @@ export default function SuperAdminSettings() {
 
           {/* Login Activity Card */}
           {/* <div className="sa-card p-0 overflow-hidden sa-security-card"> */}
-            {/* <div className="sa-card-header p-4" style={{ borderBottom: '1px solid var(--border-color)',padding:'20px' }}>
+          {/* <div className="sa-card-header p-4" style={{ borderBottom: '1px solid var(--border-color)',padding:'20px' }}>
               <div>
                 <h3 className="sa-card-title">Active Login Sessions</h3>
                 <p className="sa-card-subtitle">Devices and geographic locations authorized on this platform</p>
               </div>
             </div> */}
 
-            {/* Desktop & Laptop Table View */}
-            {/* <div className="sa-table-responsive sa-desktop-only-table">
+          {/* Desktop & Laptop Table View */}
+          {/* <div className="sa-table-responsive sa-desktop-only-table">
               <table className="sa-table sa-security-table">
                 <thead>
                   <tr>
@@ -803,8 +803,8 @@ export default function SuperAdminSettings() {
               </table>
             </div> */}
 
-            {/* Mobile / Tablet Responsive Sessions List */}
-            {/* <div className="sa-mobile-only-cards sa-security-sessions-mobile">
+          {/* Mobile / Tablet Responsive Sessions List */}
+          {/* <div className="sa-mobile-only-cards sa-security-sessions-mobile">
               {securitySettings.loginActivity.map((session) => (
                 <div key={session.id} className="sa-mobile-entity-card sa-session-card">
                   <div className="sa-mobile-card-top">

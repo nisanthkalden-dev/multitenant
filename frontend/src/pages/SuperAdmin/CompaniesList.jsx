@@ -83,9 +83,7 @@ export default function CompaniesList() {
       <div className="sa-section-header">
         <div>
           <h2 className="sa-section-title">Companies</h2>
-          <p className="sa-section-subtitle">
-            Manage organizations using the NEXORA CRM platform. ({filteredCompanies.length} visible)
-          </p>
+
         </div>
         <Link to="/super-admin/companies/add" className="btn btn-primary font-mono">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -258,7 +256,7 @@ export default function CompaniesList() {
                       </td>
                       <td>
                         <div className="sa-sub-info font-mono">
-                          <span className="sa-price-val">{comp.price}</span>
+                          <span className="sa-price-val">{comp.price}  </span>
                           <span className="sa-cycle-lbl">{comp.billingCycle}</span>
                         </div>
                       </td>
@@ -459,18 +457,17 @@ export default function CompaniesList() {
               </button>
               <button
                 type="button"
-                className={`btn btn-sm font-mono ${
-                  actionModal.type === 'delete' || actionModal.type === 'suspend'
-                    ? 'btn-danger'
-                    : 'btn-primary'
-                }`}
+                className={`btn btn-sm font-mono ${actionModal.type === 'delete' || actionModal.type === 'suspend'
+                  ? 'btn-danger'
+                  : 'btn-primary'
+                  }`}
                 disabled={actionLoading}
                 onClick={handleActionConfirm}
               >
                 {actionLoading ? 'Processing...' : (
                   actionModal.type === 'suspend' ? 'Confirm Suspension' :
-                  actionModal.type === 'activate' ? 'Confirm Activation' :
-                  'Confirm Delete'
+                    actionModal.type === 'activate' ? 'Confirm Activation' :
+                      'Confirm Delete'
                 )}
               </button>
             </div>
