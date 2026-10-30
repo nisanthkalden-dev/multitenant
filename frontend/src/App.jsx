@@ -26,6 +26,7 @@ import CompaniesList from './pages/SuperAdmin/CompaniesList';
 import AddCompany from './pages/SuperAdmin/AddCompany';
 import CompanyDetails from './pages/SuperAdmin/CompanyDetails';
 import SubscriptionsPage from './pages/SuperAdmin/Subscriptions';
+import PlanManagementPage from './pages/SuperAdmin/PlanManagement';
 import SuperAdminSettings from './pages/SuperAdmin/Settings';
 
 export default function App() {
@@ -184,6 +185,14 @@ export default function App() {
                 element={
                   <ProtectedRoute requiredRole="super_admin">
                     <SubscriptionsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin/subscription-settings"
+                element={
+                  <ProtectedRoute requiredRole="super_admin">
+                    <PlanManagementPage />
                   </ProtectedRoute>
                 }
               />
