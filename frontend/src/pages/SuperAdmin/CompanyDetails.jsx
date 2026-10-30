@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useSuperAdmin } from '../../context/SuperAdminContext';
+import { companyApi } from '../../api/companyApi';
 import AdminLayout from '../../components/SuperAdmin/AdminLayout';
 import StatusBadge from '../../components/SuperAdmin/StatusBadge';
 
@@ -9,12 +10,42 @@ export default function CompanyDetails() {
   const navigate = useNavigate();
   const { companies, updateCompanyStatus } = useSuperAdmin();
 
+  const [companyDetails, setCompanyDetails] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
 
-  const company = companies.find((c) => c.id === id);
+  // Fallback to context company while specific dossier loads
+  const contextCompany = companies.find((c) => c.id === id);
 
-  if (!company) {
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchDetails() {
+      setLoading(true);
+      try {
+        const data = await companyApi.getCompanyById(id);
+        if (isMounted && data) {
+          setCompanyDetails(data);
+        }
+      } catch (err) {
+        console.warn('Could not fetch detailed company dossier:', err.message);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    if (id) {
+      fetchDetails();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id]);
+
+  const company = companyDetails || contextCompany;
+
+  if (!company && !loading) {
     return (
       <AdminLayout title="Company Not Found" breadcrumb={['Companies', 'Not Found']}>
         <div className="sa-card text-center" style={{ padding: '60px 20px' }}>
@@ -31,13 +62,27 @@ export default function CompanyDetails() {
     );
   }
 
+  if (!company && loading) {
+    return (
+      <AdminLayout title="Loading Company..." breadcrumb={['Companies', 'Loading']}>
+        <div className="sa-card text-center font-mono" style={{ padding: '60px 20px', color: 'var(--text-muted)' }}>
+          Retrieving verified tenant records from secure database...
+        </div>
+      </AdminLayout>
+    );
+  }
+
   const isSuspended = company.status === 'Suspended';
 
   const toggleStatus = async () => {
     setUpdating(true);
     setUpdateError('');
     try {
-      await updateCompanyStatus(company.id, isSuspended ? 'Active' : 'Suspended');
+      const nextStatus = isSuspended ? 'Active' : 'Suspended';
+      await updateCompanyStatus(company.id, nextStatus);
+      if (companyDetails) {
+        setCompanyDetails({ ...companyDetails, status: nextStatus });
+      }
     } catch (err) {
       setUpdateError(err.message || 'Failed to update company status');
     } finally {
@@ -130,43 +175,65 @@ export default function CompanyDetails() {
           <div className="sa-stat-card">
             <span className="sa-stat-title">Total Users</span>
             <div className="sa-stat-value font-mono">
-              {company.usersCount} <span className="sa-stat-sub font-mono">/ {company.userLimit}</span>
+              {company.usersCount ?? 0}{' '}
+              {company.userLimit ? (
+                <span className="sa-stat-sub font-mono">/ {company.userLimit}</span>
+              ) : null}
             </div>
             <div className="sa-stat-growth positive font-mono">
-              {Math.round((company.usersCount / company.userLimit) * 100)}% capacity allocated
+              {company.userLimit
+                ? `${Math.round(((company.usersCount || 0) / company.userLimit) * 100)}% capacity allocated`
+                : 'Assigned tenant seats'}
             </div>
           </div>
 
           <div className="sa-stat-card">
             <span className="sa-stat-title">Active Users Today</span>
-            <div className="sa-stat-value font-mono">{company.metrics?.activeUsers || company.usersCount}</div>
-            <div className="sa-stat-growth positive font-mono">Real-time session presence</div>
+            <div
+              className="sa-stat-value font-mono"
+              style={{ fontSize: company.metrics?.activeUsers != null ? '2.2rem' : '1.3rem' }}
+            >
+              {company.metrics?.activeUsers != null ? company.metrics.activeUsers : 'Not available'}
+            </div>
+            <div className="sa-stat-growth neutral font-mono">Real-time session presence</div>
           </div>
 
           <div className="sa-stat-card">
             <span className="sa-stat-title">Storage Usage</span>
-            <div className="sa-stat-value font-mono" style={{ fontSize: '1.4rem' }}>
-              {company.metrics?.storageUsed || '14.2 GB / 50 GB'}
+            <div
+              className="sa-stat-value font-mono"
+              style={{ fontSize: company.metrics?.storageUsed ? '1.4rem' : '1.3rem' }}
+            >
+              {company.metrics?.storageUsed || 'Not available'}
             </div>
             <div className="sa-stat-growth neutral font-mono">Isolated tenant bucket</div>
           </div>
 
           <div className="sa-stat-card">
             <span className="sa-stat-title">CRM Leads Managed</span>
-            <div className="sa-stat-value font-mono">{company.metrics?.leads?.toLocaleString() || 1200}</div>
+            <div className="sa-stat-value font-mono">
+              {company.metrics?.leads != null ? company.metrics.leads.toLocaleString() : 0}
+            </div>
             <div className="sa-stat-growth positive font-mono">Active pipeline entities</div>
           </div>
 
           <div className="sa-stat-card">
             <span className="sa-stat-title">Total Customers</span>
-            <div className="sa-stat-value font-mono">{company.metrics?.customers?.toLocaleString() || 240}</div>
+            <div className="sa-stat-value font-mono">
+              {company.metrics?.customers != null ? company.metrics.customers.toLocaleString() : 0}
+            </div>
             <div className="sa-stat-growth positive font-mono">Contact directory records</div>
           </div>
 
           <div className="sa-stat-card">
             <span className="sa-stat-title">Deals Closed</span>
-            <div className="sa-stat-value font-mono">{company.metrics?.deals?.toLocaleString() || 45}</div>
-            <div className="sa-stat-growth positive font-mono">Won commercial opps</div>
+            <div
+              className="sa-stat-value font-mono"
+              style={{ fontSize: company.metrics?.deals != null ? '2.2rem' : '1.3rem' }}
+            >
+              {company.metrics?.deals != null ? company.metrics.deals.toLocaleString() : 'Not available'}
+            </div>
+            <div className="sa-stat-growth neutral font-mono">Won commercial opps</div>
           </div>
         </div>
       </div>
@@ -232,7 +299,12 @@ export default function CompanyDetails() {
               <div>
                 <div className="sa-owner-big-name">{company.owner?.name}</div>
                 <div className="sa-owner-big-email font-mono">{company.owner?.email}</div>
-                <div className="sa-badge-crown-tag font-mono">Primary Tenant Admin</div>
+                {company.owner?.userId && (
+                  <div className="text-xs font-mono text-tertiary mt-1">
+                    User ID: <strong>{company.owner.userId}</strong>
+                  </div>
+                )}
+                <div className="sa-badge-crown-tag font-mono mt-1">Primary Tenant Admin</div>
               </div>
             </div>
 

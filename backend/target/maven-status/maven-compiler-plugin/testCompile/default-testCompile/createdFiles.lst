@@ -1,1 +1,2 @@
 com\nexora\crm\MultiTenantCrmTests.class
+com\nexora\crm\scheduler\SubscriptionLifecycleSchedulerTest.class

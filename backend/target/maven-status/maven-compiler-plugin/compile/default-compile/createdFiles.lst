@@ -18,6 +18,7 @@ com\nexora\crm\entity\CompanySetting.class
 com\nexora\crm\security\JwtAccessDeniedHandler.class
 com\nexora\crm\dto\lead\LeadRequest.class
 com\nexora\crm\entity\User.class
+com\nexora\crm\scheduler\SubscriptionLifecycleScheduler.class
 com\nexora\crm\controller\SuperAdminController.class
 com\nexora\crm\exception\ResourceNotFoundException.class
 com\nexora\crm\config\SecurityConfig.class
@@ -38,6 +39,7 @@ com\nexora\crm\dto\lead\LeadResponse.class
 com\nexora\crm\controller\LeadController.class
 com\nexora\crm\controller\SubscriptionAndSettingsController.class
 com\nexora\crm\service\TaskService.class
+com\nexora\crm\scheduler\SubscriptionLifecycleScheduler$ProcessResult.class
 com\nexora\crm\service\CompanyService.class
 com\nexora\crm\entity\Subscription.class
 com\nexora\crm\service\LeadService.class
