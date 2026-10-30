@@ -4,41 +4,31 @@ import { subscriptionApi } from '../api/subscriptionApi';
 import { dashboardApi } from '../api/dashboardApi';
 import { userApi } from '../api/userApi';
 import { useAuth } from './AuthContext';
-import { revenueMonthlyData as defaultRevenueData, subscriptionDistribution as defaultSubDistribution, platformRecentActivities as defaultActivities } from '../data/dashboard';
+import {
+  superAdminStats,
+  revenueMonthlyData as defaultRevenueData,
+  subscriptionDistribution as defaultSubDistribution,
+  platformRecentActivities as defaultActivities
+} from '../data/dashboard';
 import { initialCompanies } from '../data/companies';
 import { initialSubscriptions, subscriptionPlans } from '../data/subscriptions';
-import { superAdminStats, revenueMonthlyData, subscriptionDistribution, platformRecentActivities } from '../data/dashboard';
-import { companyApi } from '../api/companyApi';
-import { subscriptionApi } from '../api/subscriptionApi';
-import { dashboardApi } from '../api/dashboardApi';
 
 const SuperAdminContext = createContext(null);
 
 export function SuperAdminProvider({ children }) {
   const { role } = useAuth();
-  const [companies, setCompanies] = useState([]);
-  const [subscriptions, setSubscriptions] = useState([]);
-  const [plans, setPlans] = useState([]);
-  const [activities, setActivities] = useState(defaultActivities);
-  const [stats, setStats] = useState({
-    totalCompanies: { value: '0', growth: '+0%', trend: 'up' },
-    activeCompanies: { value: '0', growth: '+0%', trend: 'up' },
-    totalUsers: { value: '0', growth: '+0%', trend: 'up' },
-    activeSubscriptions: { value: '0', growth: '+0%', trend: 'up' },
-    monthlyRevenue: { value: '₹0', growth: '+0%', trend: 'up' },
-    avgSubscriptionValue: { value: '₹0', growth: '+0%', trend: 'up' }
-  });
-  const [revenueMonthlyData, setRevenueMonthlyData] = useState(defaultRevenueData);
-  const [subscriptionDistribution, setSubscriptionDistribution] = useState(defaultSubDistribution);
   const [companies, setCompanies] = useState(initialCompanies);
   const [subscriptions, setSubscriptions] = useState(initialSubscriptions);
   const [plans, setPlans] = useState(subscriptionPlans);
-  const [activities, setActivities] = useState(platformRecentActivities);
+  const [activities, setActivities] = useState(defaultActivities);
   const [stats, setStats] = useState(superAdminStats);
-  const [revenueData, setRevenueData] = useState(revenueMonthlyData);
+
+  const [revenueMonthlyData, setRevenueMonthlyData] = useState(defaultRevenueData);
+  const [revenueData, setRevenueData] = useState(defaultRevenueData);
   const [revenueData6M, setRevenueData6M] = useState(null);
   const [revenueData1Y, setRevenueData1Y] = useState(null);
-  const [distributionData, setDistributionData] = useState(subscriptionDistribution);
+  const [subscriptionDistribution, setSubscriptionDistribution] = useState(defaultSubDistribution);
+  const [distributionData, setDistributionData] = useState(defaultSubDistribution);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -91,39 +81,6 @@ export function SuperAdminProvider({ children }) {
     collapsedSidebar: false
   });
 
-  // Fetch Super Admin platform data from Backend
-  const refreshSuperAdminData = useCallback(async () => {
-    if (role !== 'super_admin') return;
-    setLoading(true);
-    setError(null);
-    try {
-      const [dashRes, compRes, subsRes, plansRes] = await Promise.all([
-        dashboardApi.getSuperAdminDashboard().catch(() => null),
-        companyApi.getCompanies({ page: 0, size: 100 }).catch(() => null),
-        subscriptionApi.getAllSubscriptions().catch(() => null),
-        subscriptionApi.getPlans().catch(() => null)
-      ]);
-
-      if (dashRes) {
-        if (dashRes.stats) setStats(dashRes.stats);
-        if (dashRes.revenueMonthlyData) setRevenueMonthlyData(dashRes.revenueMonthlyData);
-        if (dashRes.subscriptionDistribution) setSubscriptionDistribution(dashRes.subscriptionDistribution);
-        if (dashRes.platformRecentActivities) setActivities(dashRes.platformRecentActivities);
-      }
-
-      if (compRes?.data) {
-        setCompanies(compRes.data);
-      }
-
-      if (subsRes?.data) {
-        setSubscriptions(subsRes.data);
-      }
-
-      if (plansRes && Array.isArray(plansRes)) {
-        setPlans(plansRes);
-      }
-    } catch (err) {
-      console.error('Failed to load super admin data from API:', err);
   // Fetch Companies from Backend
   const refreshCompanies = useCallback(async () => {
     try {
@@ -158,7 +115,7 @@ export function SuperAdminProvider({ children }) {
         setPlans(availablePlans);
       }
     } catch (err) {
-      // Fallback
+      // Fallback to default plans
     }
   }, []);
 
@@ -190,10 +147,19 @@ export function SuperAdminProvider({ children }) {
       const dashboard = await dashboardApi.getSuperAdminDashboard(period);
       if (dashboard) {
         if (dashboard.stats) setStats(dashboard.stats);
-        if (dashboard.revenueMonthlyData) setRevenueData(dashboard.revenueMonthlyData);
+        if (dashboard.revenueMonthlyData) {
+          setRevenueData(dashboard.revenueMonthlyData);
+          setRevenueMonthlyData(dashboard.revenueMonthlyData);
+        }
         if (dashboard.revenueMonthlyData6M) setRevenueData6M(dashboard.revenueMonthlyData6M);
         if (dashboard.revenueMonthlyData1Y) setRevenueData1Y(dashboard.revenueMonthlyData1Y);
-        if (dashboard.subscriptionDistribution) setDistributionData(dashboard.subscriptionDistribution);
+        if (dashboard.subscriptionDistribution) {
+          setDistributionData(dashboard.subscriptionDistribution);
+          setSubscriptionDistribution(dashboard.subscriptionDistribution);
+        }
+        if (dashboard.platformRecentActivities) {
+          setActivities(dashboard.platformRecentActivities);
+        }
       }
     } catch (err) {
       console.warn('Could not fetch super admin dashboard stats:', err.message);
@@ -220,6 +186,7 @@ export function SuperAdminProvider({ children }) {
     }
   }, []);
 
+  // Aggregated refresh function
   const refreshAll = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -238,15 +205,18 @@ export function SuperAdminProvider({ children }) {
       setLoading(false);
     }
   }, [refreshCompanies, refreshSubscriptions, refreshPlans, refreshSettings, refreshProfile, refreshDashboard]);
-  }, [role]);
+
+  // Backward compatibility alias
+  const refreshSuperAdminData = refreshAll;
 
   useEffect(() => {
-    if (role === 'super_admin') {
-      refreshSuperAdminData();
+    const rawSession = localStorage.getItem('nexora_auth_session');
+    if (rawSession || role === 'super_admin') {
+      refreshAll();
     }
-  }, [role, refreshSuperAdminData]);
+  }, [role, refreshAll]);
 
-  // Actions connecting to real backend API
+  // Actions
   const addCompany = async (newCompanyData) => {
     const payload = {
       name: newCompanyData.name,
@@ -255,43 +225,42 @@ export function SuperAdminProvider({ children }) {
       address: newCompanyData.address,
       plan: newCompanyData.plan || 'Growth',
       billingCycle: newCompanyData.billingCycle || 'Monthly',
+      price: newCompanyData.price,
       userLimit: Number(newCompanyData.userLimit) || 20,
       adminName: newCompanyData.adminName || `${newCompanyData.name} Admin`,
-      adminEmail: newCompanyData.adminEmail || newCompanyData.email
+      adminEmail: newCompanyData.adminEmail || newCompanyData.email,
+      adminPassword: newCompanyData.adminPassword
     };
 
     const created = await companyApi.createCompany(payload);
-    await refreshSuperAdminData();
-  }, [refreshCompanies, refreshSubscriptions, refreshPlans, refreshDashboard]);
-
-  useEffect(() => {
-    // Only attempt fetch if user has active session
-    const rawSession = localStorage.getItem('nexora_auth_session');
-    if (rawSession) {
-      refreshAll();
-    }
-  }, [refreshAll]);
-
-  // Actions
-  const addCompany = async (newCompanyData) => {
-    // Call backend API to provision tenant in MySQL
-    const created = await companyApi.createCompany(newCompanyData);
-    // Refresh list, subscriptions, and dashboard to reflect live database state
     await refreshAll();
     return created;
   };
 
   const updateCompanyStatus = async (companyId, newStatus) => {
-    await companyApi.updateCompany(companyId, { status: newStatus });
-    await refreshSuperAdminData();
+    try {
+      await companyApi.updateCompany(companyId, { status: newStatus });
+      await refreshAll();
+    } catch (err) {
+      console.error('Failed to update company status:', err);
+      setCompanies(prev =>
+        prev.map(c => (c.id === companyId ? { ...c, status: newStatus } : c))
+      );
+      throw err;
+    }
   };
 
   const deleteCompany = async (companyId) => {
-    await companyApi.deleteCompany(companyId);
-    await refreshSuperAdminData();
+    try {
+      await companyApi.deleteCompany(companyId);
+      await refreshAll();
+    } catch (err) {
+      console.error('Failed to delete/suspend company:', err);
+      setCompanies(prev => prev.filter(c => c.id !== companyId));
+      throw err;
+    }
   };
 
-  // Profile and Password persistence
   const saveProfileSettings = async (profileData) => {
     const res = await userApi.updateProfile({
       name: profileData.fullName,
@@ -305,25 +274,6 @@ export function SuperAdminProvider({ children }) {
       email: res.email || prev.email
     }));
     return res;
-    try {
-      await companyApi.updateCompany(companyId, { status: newStatus });
-      await refreshAll();
-    } catch (err) {
-      console.error('Failed to update company status:', err);
-      setCompanies(prev =>
-        prev.map(c => (c.id === companyId ? { ...c, status: newStatus } : c))
-      );
-    }
-  };
-
-  const deleteCompany = async (companyId) => {
-    try {
-      await companyApi.deleteCompany(companyId);
-      await refreshAll();
-    } catch (err) {
-      console.error('Failed to delete/suspend company:', err);
-      setCompanies(prev => prev.filter(c => c.id !== companyId));
-    }
   };
 
   const updateSubscriptionAction = async (id, subscriptionData) => {
@@ -427,9 +377,8 @@ export function SuperAdminProvider({ children }) {
         refreshPlans,
         refreshSettings,
         refreshDashboard,
-        refreshAll,
-        loading,
-        error
+        refreshProfile,
+        refreshAll
       }}
     >
       {children}

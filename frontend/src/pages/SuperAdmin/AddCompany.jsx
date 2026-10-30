@@ -103,13 +103,6 @@ export default function AddCompany() {
     setApiError('');
 
     try {
-      const created = await addCompany({
-        ...formData,
-        adminName: formData.adminName || `${formData.name} Admin`,
-        adminEmail: formData.adminEmail || formData.email
-      });
-      setIsSubmitting(false);
-      setFeedbackSuccess(true);
       const planPrices = {
         Starter: '₹999',
         Growth: '₹2,499',
@@ -137,13 +130,7 @@ export default function AddCompany() {
         navigate(`/super-admin/companies/${created.id}`);
       }, 700);
     } catch (err) {
-      setIsSubmitting(false);
       setApiError(err.message || 'Failed to create company. Please check your data.');
-        navigate(`/super-admin/companies/${created.id || ''}`);
-      }, 900);
-    } catch (err) {
-      console.error('Failed to provision company:', err);
-      setServerError(err.message || 'Failed to save company to MySQL database. Please verify connection.');
     } finally {
       setIsSubmitting(false);
     }
@@ -177,11 +164,6 @@ export default function AddCompany() {
         )}
 
         {apiError && (
-            <span>Company saved successfully in MySQL! Redirecting...</span>
-          </div>
-        )}
-
-        {serverError && (
           <div className="auth-alert alert-error font-mono mb-4" role="alert">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="12" cy="12" r="10"></circle>
@@ -189,7 +171,6 @@ export default function AddCompany() {
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
             <span>{apiError}</span>
-            <span>{serverError}</span>
           </div>
         )}
 

@@ -68,25 +68,6 @@ export default function SuperAdminDashboard() {
     ? points.reduce((acc, pt, idx) => (idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`), '')
     : `M 30 ${chartHeight - 15} L ${chartWidth - 30} ${chartHeight - 15}`;
 
-  // SVG Chart calculation for revenue
-  const maxRevenue = 900000;
-  const chartHeight = 160;
-  const chartWidth = 500;
-  const safeData = Array.isArray(revenueMonthlyData) ? revenueMonthlyData : [];
-  const points = safeData.map((d, index) => {
-    const divisor = safeData.length > 1 ? safeData.length - 1 : 1;
-    const x = (index / divisor) * (chartWidth - 60) + 30;
-    const y = chartHeight - ((d.revenue || 0) / maxRevenue) * (chartHeight - 30) - 15;
-    return { x, y, ...d };
-  });
-
-  const pathD = points.length > 0
-    ? points.reduce(
-        (acc, pt, idx) => (idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`),
-        ''
-      )
-    : '';
-
   const areaD = points.length > 0
     ? `${pathD} L ${points[points.length - 1].x} ${chartHeight} L ${points[0].x} ${chartHeight} Z`
     : '';
