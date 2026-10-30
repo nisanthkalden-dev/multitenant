@@ -1,4 +1,4 @@
-// Frontend-only Mock Subscription Plans & Subscriptions Data
+// Platform Subscription Plans & Defaults
 export const subscriptionPlans = [
   {
     id: 'plan-starter',
@@ -21,8 +21,8 @@ export const subscriptionPlans = [
       'Basic Reports'
     ],
     stats: {
-      activeCompanies: 82,
-      mrrContribution: '₹81,918'
+      activeCompanies: 0,
+      mrrContribution: '₹0'
     }
   },
   {
@@ -47,8 +47,8 @@ export const subscriptionPlans = [
       'Activity Tracking'
     ],
     stats: {
-      activeCompanies: 103,
-      mrrContribution: '₹2,57,397'
+      activeCompanies: 0,
+      mrrContribution: '₹0'
     }
   },
   {
@@ -72,107 +72,11 @@ export const subscriptionPlans = [
       'Custom Configuration'
     ],
     stats: {
-      activeCompanies: 44,
-      mrrContribution: '₹2,63,956'
+      activeCompanies: 0,
+      mrrContribution: '₹0'
     }
   }
 ];
 
-export const initialSubscriptions = [
-  {
-    id: 'sub-1001',
-    companyId: 'cmp-101',
-    companyName: 'Acme Technologies',
-    plan: 'Growth',
-    billingCycle: 'Monthly',
-    amount: '₹2,499',
-    status: 'Active',
-    startDate: 'Oct 14, 2026',
-    renewalDate: 'Nov 14, 2026',
-    autoRenew: true
-  },
-  {
-    id: 'sub-1002',
-    companyId: 'cmp-102',
-    companyName: 'Zenith Health Systems',
-    plan: 'Scale',
-    billingCycle: 'Annual',
-    amount: '₹57,588',
-    status: 'Active',
-    startDate: 'Sep 28, 2026',
-    renewalDate: 'Sep 28, 2027',
-    autoRenew: true
-  },
-  {
-    id: 'sub-1003',
-    companyId: 'cmp-103',
-    companyName: 'Aura Fintech Solutions',
-    plan: 'Scale',
-    billingCycle: 'Monthly',
-    amount: '₹5,999',
-    status: 'Active',
-    startDate: 'Aug 19, 2026',
-    renewalDate: 'Nov 19, 2026',
-    autoRenew: true
-  },
-  {
-    id: 'sub-1004',
-    companyId: 'cmp-104',
-    companyName: 'Vortex Global Logistics',
-    plan: 'Growth',
-    billingCycle: 'Monthly',
-    amount: '₹2,499',
-    status: 'Active',
-    startDate: 'Oct 18, 2026',
-    renewalDate: 'Nov 01, 2026',
-    autoRenew: true
-  },
-  {
-    id: 'sub-1005',
-    companyId: 'cmp-105',
-    companyName: 'Skyline Creative Studio',
-    plan: 'Starter',
-    billingCycle: 'Monthly',
-    amount: '₹999',
-    status: 'Active',
-    startDate: 'Jul 04, 2026',
-    renewalDate: 'Nov 04, 2026',
-    autoRenew: true
-  },
-  {
-    id: 'sub-1006',
-    companyId: 'cmp-106',
-    companyName: 'Pulse Media Labs',
-    plan: 'Growth',
-    billingCycle: 'Monthly',
-    amount: '₹2,499',
-    status: 'Active',
-    startDate: 'Oct 21, 2026',
-    renewalDate: 'Nov 04, 2026',
-    autoRenew: true
-  },
-  {
-    id: 'sub-1007',
-    companyId: 'cmp-107',
-    companyName: 'BluePeak Capital',
-    plan: 'Scale',
-    billingCycle: 'Annual',
-    amount: '₹57,588',
-    status: 'Suspended',
-    startDate: 'May 12, 2026',
-    renewalDate: 'Oct 12, 2026',
-    autoRenew: false
-  },
-  {
-    id: 'sub-1008',
-    companyId: 'cmp-108',
-    companyName: 'Hyperion Analytics',
-    plan: 'Scale',
-    billingCycle: 'Annual',
-    amount: '₹57,588',
-    status: 'Active',
-    startDate: 'Jan 15, 2026',
-    renewalDate: 'Jan 15, 2027',
-    autoRenew: true
-  }
-];
+// Clean real array: starts empty and loads live records from MySQL
+export const initialSubscriptions = [];

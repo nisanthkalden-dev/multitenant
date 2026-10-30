@@ -1,29 +1,60 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import { MOCK_CUSTOMERS, MOCK_LEADS, MOCK_TASKS, MOCK_ACTIVITIES } from '../../../data/mockTenantData';
-import { MOCK_USERS } from '../../../data/mockUsers';
+import { dashboardApi } from '../../../api/dashboardApi';
+import { taskApi } from '../../../api/taskApi';
 
 export default function ManagerDashboard() {
-  const { user, companyId } = useAuth();
+  const { user } = useAuth();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [taskFilter, setTaskFilter] = useState('All');
 
-  // Filter tenant records
-  const teamMembers = MOCK_USERS.filter(
-    (u) => u.companyId === companyId && u.role === 'employee'
-  );
-  const tenantCustomers = MOCK_CUSTOMERS.filter((c) => c.companyId === companyId);
-  const tenantLeads = MOCK_LEADS.filter((l) => l.companyId === companyId);
-  const tenantTasks = MOCK_TASKS.filter((t) => t.companyId === companyId);
-  const teamActivities = MOCK_ACTIVITIES.filter((a) => a.companyId === companyId);
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchDashboard() {
+      try {
+        setLoading(true);
+        const data = await dashboardApi.getManagerDashboard();
+        if (isMounted) setDashboardData(data);
+      } catch (err) {
+        if (isMounted) setError(err.message || 'Failed to load manager dashboard');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    fetchDashboard();
+    return () => { isMounted = false; };
+  }, []);
 
-  const pendingTasks = tenantTasks.filter((t) => t.status === 'Pending');
-  const completedTasks = tenantTasks.filter((t) => t.status === 'Completed');
+  const handleToggleTask = async (taskId) => {
+    try {
+      await taskApi.toggleTaskStatus(taskId);
+      const updated = await dashboardApi.getManagerDashboard();
+      setDashboardData(updated);
+    } catch (err) {
+      alert(err.message || 'Failed to update task');
+    }
+  };
+
+  const metrics = dashboardData?.metrics || {
+    totalEmployees: 0,
+    totalCustomers: 0,
+    activeLeads: 0,
+    pendingTasks: 0,
+    monthlyRevenue: '₹0',
+    conversionRate: '0%'
+  };
+
+  const recentTasks = dashboardData?.recentTasks || [];
+  const recentLeads = dashboardData?.recentLeads || [];
+  const recentActivities = dashboardData?.recentActivities || [];
 
   const filteredTasks =
     taskFilter === 'All'
-      ? tenantTasks
-      : tenantTasks.filter((t) => t.status === taskFilter);
+      ? recentTasks
+      : recentTasks.filter((t) => t.status === taskFilter);
 
   return (
     <div className="role-dashboard-container manager-dashboard">
@@ -35,7 +66,7 @@ export default function ManagerDashboard() {
           </div>
           <h2 className="banner-title">Manager Workspace: {user?.name || 'Manager'}</h2>
           <p className="banner-subtitle">
-            Lead coordination and performance tracking for <strong>{user?.companyName}</strong>. Monitor team activities, pipeline momentum, and task allocations.
+            Lead coordination and performance tracking for <strong>{dashboardData?.companyName || user?.companyName}</strong>. Monitor team activities, pipeline momentum, and task allocations.
           </p>
         </div>
         <div className="banner-actions">
@@ -43,10 +74,20 @@ export default function ManagerDashboard() {
             + Assign Task
           </Link>
           <Link to="/company/team" className="btn btn-secondary font-mono btn-sm">
-            View Team ({teamMembers.length})
+            View Team ({metrics.totalEmployees})
           </Link>
         </div>
       </div>
+
+      {loading && (
+        <div className="font-mono text-center text-muted p-4">Loading real-time manager metrics...</div>
+      )}
+
+      {error && (
+        <div className="auth-alert alert-error font-mono mb-4">
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* KPI Stat Cards Grid */}
       <div className="crm-stats-grid">
@@ -61,9 +102,9 @@ export default function ManagerDashboard() {
               </svg>
             </div>
           </div>
-          <div className="stat-number font-mono">{teamMembers.length} Active Staff</div>
+          <div className="stat-number font-mono">{metrics.totalEmployees} Active Staff</div>
           <div className="stat-footer font-mono positive">
-            <span>100% attendance & availability</span>
+            <span>Team members monitored</span>
           </div>
         </div>
 
@@ -77,30 +118,30 @@ export default function ManagerDashboard() {
               </svg>
             </div>
           </div>
-          <div className="stat-number font-mono">92.4% SLA</div>
+          <div className="stat-number font-mono">{metrics.conversionRate} Win Rate</div>
           <div className="stat-footer font-mono positive">
-            <span>+4.2% higher vs last cycle</span>
+            <span>Pipeline closed opportunities</span>
           </div>
         </div>
 
         <div className="crm-stat-card">
           <div className="stat-card-header">
-            <span className="stat-title">Active Team Leads</span>
+            <span className="stat-title">Team Deals</span>
             <div className="stat-icon-wrap" style={{ color: '#38bdf8' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
               </svg>
             </div>
           </div>
-          <div className="stat-number font-mono">{tenantLeads.length}</div>
+          <div className="stat-number font-mono">{metrics.activeLeads} In-Flight</div>
           <div className="stat-footer font-mono positive">
-            <span>Assigned across sales personnel</span>
+            <span>{metrics.monthlyRevenue} Total Target</span>
           </div>
         </div>
 
         <div className="crm-stat-card">
           <div className="stat-card-header">
-            <span className="stat-title">Pending Tasks</span>
+            <span className="stat-title">Tasks Pending</span>
             <div className="stat-icon-wrap" style={{ color: '#f59e0b' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"></circle>
@@ -108,176 +149,144 @@ export default function ManagerDashboard() {
               </svg>
             </div>
           </div>
-          <div className="stat-number font-mono">{pendingTasks.length} Due</div>
+          <div className="stat-number font-mono">{metrics.pendingTasks} Action Items</div>
           <div className="stat-footer font-mono neutral">
-            <span>{completedTasks.length} tasks marked complete</span>
+            <span>Requires team coordination</span>
           </div>
         </div>
       </div>
 
-      {/* Team Roster & Tasks Allocation Section */}
-      <div className="crm-panels-split-2">
-        {/* Left: Team Members & Performance Status */}
+      {/* Two Column Section */}
+      <div className="crm-two-columns mt-6">
+        {/* Left Column: Team Tasks & Pipeline */}
         <div className="crm-column-group">
           <div className="crm-panel-card">
             <div className="panel-card-header">
               <div>
-                <h3 className="panel-card-title">Supervised Staff & Team Roster</h3>
-                <p className="panel-card-subtitle">Staff reporting to {user?.name}</p>
+                <h3 className="panel-card-title">Team Operational Tasks</h3>
+                <p className="panel-card-subtitle">Assigned follow-ups and client action items</p>
               </div>
-              <Link to="/company/team" className="btn btn-secondary btn-xs font-mono">
-                Manage Team
-              </Link>
-            </div>
-
-            <div className="team-roster-list">
-              {teamMembers.map((member) => {
-                const assignedLeadsCount = tenantLeads.filter(
-                  (l) => l.assignedTo === member.userId
-                ).length;
-                const assignedTasksCount = tenantTasks.filter(
-                  (t) => t.assignedTo === member.userId && t.status === 'Pending'
-                ).length;
-
-                return (
-                  <div key={member.userId} className="team-member-row">
-                    <div className="member-avatar font-mono">{member.avatar}</div>
-                    <div className="member-meta">
-                      <div className="member-name font-semibold">{member.name}</div>
-                      <div className="member-email font-mono text-muted text-xs">
-                        {member.email} &bull; {member.department}
-                      </div>
-                    </div>
-                    <div className="member-stats font-mono">
-                      <span className="pill-metric">{assignedLeadsCount} Leads</span>
-                      <span className="pill-metric">{assignedTasksCount} Pending Tasks</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Active Assigned Customers */}
-          <div className="crm-panel-card">
-            <div className="panel-card-header">
-              <div>
-                <h3 className="panel-card-title">Supervised Customer Accounts</h3>
-                <p className="panel-card-subtitle">Accounts managed by your direct reports</p>
-              </div>
-              <Link to="/company/customers" className="btn btn-secondary btn-xs font-mono">
-                Directory
-              </Link>
-            </div>
-
-            <div className="crm-table-container">
-              <table className="crm-data-table">
-                <thead>
-                  <tr>
-                    <th>Customer</th>
-                    <th>Tier</th>
-                    <th>Value</th>
-                    <th>Assigned Staff</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tenantCustomers.map((cust) => (
-                    <tr key={cust.id}>
-                      <td className="font-semibold">{cust.name}</td>
-                      <td>
-                        <span className="tier-tag font-mono text-xs">{cust.tier}</span>
-                      </td>
-                      <td className="font-mono">{cust.value}</td>
-                      <td className="font-mono text-xs text-muted">{cust.assignedTo}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Team Tasks & Real-Time Activities */}
-        <div className="crm-column-group">
-          {/* Team Tasks Filterable Box */}
-          <div className="crm-panel-card">
-            <div className="panel-card-header">
-              <div>
-                <h3 className="panel-card-title">Team Task Allocations</h3>
-                <p className="panel-card-subtitle">Work items delegated across personnel</p>
-              </div>
-              <div className="sa-pill-selector">
+              <div className="panel-filter-btns">
                 <button
                   type="button"
-                  className={taskFilter === 'All' ? 'active font-mono' : 'font-mono'}
+                  className={`filter-btn ${taskFilter === 'All' ? 'active' : ''}`}
                   onClick={() => setTaskFilter('All')}
                 >
                   All
                 </button>
                 <button
                   type="button"
-                  className={taskFilter === 'Pending' ? 'active font-mono' : 'font-mono'}
+                  className={`filter-btn ${taskFilter === 'Pending' ? 'active' : ''}`}
                   onClick={() => setTaskFilter('Pending')}
                 >
                   Pending
                 </button>
                 <button
                   type="button"
-                  className={taskFilter === 'Completed' ? 'active font-mono' : 'font-mono'}
+                  className={`filter-btn ${taskFilter === 'Completed' ? 'active' : ''}`}
                   onClick={() => setTaskFilter('Completed')}
                 >
-                  Completed
+                  Done
                 </button>
               </div>
             </div>
 
-            <div className="tasks-flow-list">
-              {filteredTasks.map((task) => (
-                <div key={task.id} className="task-row-card">
-                  <div className="task-top">
-                    <span
-                      className={`task-status-badge font-mono ${
-                        task.status === 'Completed' ? 'task-done' : 'task-pending'
-                      }`}
+            <div className="crm-tasks-list">
+              {filteredTasks.length === 0 ? (
+                <div className="text-center text-muted p-4 font-mono">No tasks found matching filter.</div>
+              ) : (
+                filteredTasks.map((t) => (
+                  <div key={t.id} className="task-item-card">
+                    <button
+                      type="button"
+                      className={`check-box-btn ${t.status === 'Completed' ? 'checked' : ''}`}
+                      onClick={() => handleToggleTask(t.id)}
                     >
-                      {task.status}
-                    </span>
-                    <span className="task-due font-mono text-xs">{task.dueDate}</span>
+                      {t.status === 'Completed' && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                    <div className="task-content">
+                      <div className={`task-title ${t.status === 'Completed' ? 'line-through text-muted' : ''}`}>
+                        {t.title}
+                      </div>
+                      <div className="task-meta font-mono text-xs">
+                        <span className="task-due text-muted">Due: {t.dueDate}</span>
+                        <span className={`task-badge badge-${(t.priority || 'medium').toLowerCase()}`}>
+                          {t.priority}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="task-title font-medium">{task.title}</div>
-                  <div className="task-footer font-mono text-xs text-muted">
-                    <span>Assigned to: <strong>{task.assignedTo}</strong></span>
-                    <span>&bull;</span>
-                    <span>Context: {task.relatedTo}</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
+        </div>
 
-          {/* Team Live Audit Activity */}
+        {/* Right Column: Recent Activities & Pipeline Leads */}
+        <div className="crm-column-group">
+          {/* Active Deals */}
           <div className="crm-panel-card">
             <div className="panel-card-header">
               <div>
-                <h3 className="panel-card-title">Recent Team Activities</h3>
-                <p className="panel-card-subtitle">Live events logged by supervised staff</p>
+                <h3 className="panel-card-title">Commercial Deals</h3>
+                <p className="panel-card-subtitle">Active opportunities across accounts</p>
+              </div>
+              <Link to="/company/leads" className="btn btn-secondary btn-xs font-mono">
+                Pipeline
+              </Link>
+            </div>
+
+            <div className="crm-lead-cards-list">
+              {recentLeads.length === 0 ? (
+                <div className="text-center text-muted p-4 font-mono">No active deals found.</div>
+              ) : (
+                recentLeads.slice(0, 3).map((lead) => (
+                  <div key={lead.id} className="crm-lead-item">
+                    <div className="lead-item-header">
+                      <span className="lead-company font-semibold">{lead.company}</span>
+                      <span className="lead-val font-mono">{lead.value || lead.estimatedValue}</span>
+                    </div>
+                    <div className="lead-item-title text-muted text-sm">{lead.title}</div>
+                    <div className="lead-item-footer font-mono">
+                      <span className="lead-stage-pill">{lead.stage}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Activity Log */}
+          <div className="crm-panel-card">
+            <div className="panel-card-header">
+              <div>
+                <h3 className="panel-card-title">Team Activity Stream</h3>
+                <p className="panel-card-subtitle">Recent sales touches and interactions</p>
               </div>
             </div>
 
             <div className="crm-activity-feed">
-              {teamActivities.map((act) => (
-                <div key={act.id} className="activity-row">
-                  <div className="act-bullet manager-bullet"></div>
-                  <div className="act-body">
-                    <div className="act-action">
-                      <strong>{act.userName}</strong>: {act.action}
-                    </div>
-                    <div className="act-meta font-mono">
-                      <span>{act.target}</span> &bull; <span>{act.time}</span>
+              {recentActivities.length === 0 ? (
+                <div className="text-center text-muted p-4 font-mono">No recent activity.</div>
+              ) : (
+                recentActivities.slice(0, 5).map((act) => (
+                  <div key={act.id} className="activity-row">
+                    <div className="act-bullet"></div>
+                    <div className="act-body">
+                      <div className="act-action">
+                        <strong>{act.userName || 'Member'}</strong>: {act.action}
+                      </div>
+                      <div className="act-meta font-mono">
+                        <span>{act.target || 'Workspace'}</span> &bull; <span>{act.time}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -1,61 +1,126 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import CompanyLayout from '../../components/Layout/CompanyLayout';
 import { useAuth } from '../../context/AuthContext';
-import { MOCK_TASKS } from '../../data/mockTenantData';
-import { MOCK_USERS } from '../../data/mockUsers';
+import { taskApi } from '../../api/taskApi';
+import { userApi } from '../../api/userApi';
 import RoleGuard from '../../components/RoleGuard/RoleGuard';
 
 export default function TasksPage() {
   const { user, role, companyId } = useAuth();
-  const [tasks, setTasks] = useState(() =>
-    MOCK_TASKS.filter((t) => {
-      if (t.companyId !== companyId) return false;
-      if (role === 'employee') {
-        return t.assignedTo === user?.userId;
-      }
-      return true;
-    })
-  );
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  // Assign Task Modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDueDate, setNewDueDate] = useState('');
+  const [newPriority, setNewPriority] = useState('Medium');
   const [newAssignedTo, setNewAssignedTo] = useState('employee');
   const [newRelatedTo, setNewRelatedTo] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [modalError, setModalError] = useState('');
 
-  const companyStaff = MOCK_USERS.filter((u) => u.companyId === companyId);
+  // Delete modal state
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, task: null });
+  const [deleting, setDeleting] = useState(false);
 
-  const toggleTask = (taskId) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? { ...t, status: t.status === 'Completed' ? 'Pending' : 'Completed' }
-          : t
-      )
-    );
+  // Staff list for assigning
+  const [companyStaff, setCompanyStaff] = useState([]);
+
+  const loadTasks = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await taskApi.getTasks({
+        search: searchTerm,
+        status: statusFilter,
+        page: 0,
+        size: 100
+      });
+      setTasks(res.data || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
+
+  useEffect(() => {
+    async function loadUsers() {
+      if (companyId) {
+        try {
+          const res = await userApi.getCompanyUsers(companyId, { page: 0, size: 50 });
+          setCompanyStaff(res.data || []);
+          if (res.data?.length > 0) {
+            setNewAssignedTo(res.data[0].userId);
+          }
+        } catch {
+          // fallback if role not permitted
+        }
+      }
+    }
+    loadUsers();
+  }, [companyId]);
+
+  const toggleTask = async (taskId) => {
+    try {
+      await taskApi.toggleTaskStatus(taskId);
+      await loadTasks();
+    } catch (err) {
+      alert(err.message || 'Failed to toggle task');
+    }
   };
 
-  const handleAssignTask = (e) => {
+  const handleAssignTask = async (e) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim()) {
+      setModalError('Task title is required');
+      return;
+    }
 
-    const newTask = {
-      id: `TASK-${Date.now()}`,
-      companyId,
-      title: newTitle.trim(),
-      dueDate: newDueDate || 'Due this week',
-      priority: 'Medium',
-      status: 'Pending',
-      category: 'General',
-      assignedTo: newAssignedTo,
-      assignedByName: `${user?.name} (${role === 'company_admin' ? 'Admin' : 'Manager'})`,
-      relatedTo: newRelatedTo || 'Operations'
-    };
+    setAssigning(true);
+    setModalError('');
 
-    setTasks((prev) => [newTask, ...prev]);
-    setNewTitle('');
-    setNewDueDate('');
-    setShowAssignModal(false);
+    try {
+      await taskApi.createTask({
+        title: newTitle.trim(),
+        dueDate: newDueDate || 'Due this week',
+        priority: newPriority,
+        category: 'General',
+        assignedTo: newAssignedTo,
+        relatedTo: newRelatedTo || 'Operations'
+      });
+      setNewTitle('');
+      setNewDueDate('');
+      setShowAssignModal(false);
+      await loadTasks();
+    } catch (err) {
+      setModalError(err.message || 'Failed to create task');
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal.task) return;
+    setDeleting(true);
+    try {
+      await taskApi.deleteTask(deleteModal.task.id);
+      setDeleteModal({ isOpen: false, task: null });
+      await loadTasks();
+    } catch (err) {
+      alert(err.message || 'Failed to delete task');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -75,8 +140,41 @@ export default function TasksPage() {
       }
     >
       <div className="crm-panel-card">
+        {/* Filters */}
+        <div className="crm-filter-toolbar">
+          <div className="crm-search-box">
+            <input
+              type="text"
+              placeholder="Search tasks by title, assignee, or category..."
+              className="form-input font-mono"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="crm-filter-selects">
+            <select
+              className="form-input font-mono"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="All">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+        </div>
+
+        {error && (
+          <div className="auth-alert alert-error font-mono m-4">
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="tasks-flow-list">
-          {tasks.length === 0 ? (
+          {loading ? (
+            <div className="crm-empty-state font-mono">Loading tasks from database...</div>
+          ) : tasks.length === 0 ? (
             <div className="crm-empty-state font-mono">No tasks recorded in this tenant view.</div>
           ) : (
             tasks.map((task) => {
@@ -98,25 +196,52 @@ export default function TasksPage() {
                     </button>
                     <span
                       className={`task-status-badge font-mono ${
-                        isDone ? 'task-done' : 'task-pending'
+                        isDone ? 'status-done' : 'status-open'
                       }`}
                     >
                       {task.status}
                     </span>
-                    <span className="task-due font-mono text-xs">{task.dueDate}</span>
+                    <span
+                      className={`task-priority-tag font-mono priority-${(
+                        task.priority || 'medium'
+                      ).toLowerCase()}`}
+                    >
+                      {task.priority}
+                    </span>
+                    <span className="task-category-tag font-mono">{task.category || 'General'}</span>
                   </div>
 
-                  <div className={`task-title font-medium ${isDone ? 'text-strikethrough' : ''}`}>
+                  <h3 className={`task-title-text ${isDone ? 'line-through' : ''}`}>
                     {task.title}
+                  </h3>
+
+                  <div className="task-meta-row font-mono text-xs">
+                    <span className="task-due text-muted">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline', marginRight: '4px' }}>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                      {task.dueDate}
+                    </span>
+                    <span>&bull;</span>
+                    <span className="task-assigned">
+                      Assigned to: <strong>{task.assignedTo || 'Unassigned'}</strong>
+                    </span>
+                    <span>&bull;</span>
+                    <span className="task-related text-muted">Context: {task.relatedTo || 'Operations'}</span>
                   </div>
 
-                  <div className="task-footer font-mono text-xs text-muted">
-                    <span>Assigned to: <strong>{task.assignedTo}</strong></span>
-                    <span>&bull;</span>
-                    <span>Assigned By: {task.assignedByName}</span>
-                    <span>&bull;</span>
-                    <span>Context: {task.relatedTo}</span>
-                  </div>
+                  <RoleGuard allowedRoles={['company_admin', 'manager']}>
+                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-xs font-mono"
+                        onClick={() => setDeleteModal({ isOpen: true, task })}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </RoleGuard>
                 </div>
               );
             })
@@ -124,12 +249,12 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Role-Protected Task Assignment Modal (Only for Admin & Manager) */}
+      {/* Assign Task Modal */}
       {showAssignModal && (
         <div className="sa-modal-backdrop" onClick={() => setShowAssignModal(false)}>
           <div className="sa-modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="sa-modal-header">
-              <h3 className="sa-modal-title">Assign New Workforce Task</h3>
+              <h3 className="sa-modal-title">Assign Operational Task</h3>
               <button
                 type="button"
                 className="sa-modal-close-btn"
@@ -140,12 +265,17 @@ export default function TasksPage() {
             </div>
             <form onSubmit={handleAssignTask}>
               <div className="sa-modal-body">
+                {modalError && (
+                  <div className="auth-alert alert-error font-mono mb-3">
+                    <span>{modalError}</span>
+                  </div>
+                )}
                 <div className="form-group mb-3">
-                  <label className="form-label">Task Objective / Title</label>
+                  <label className="form-label">Task Directive</label>
                   <input
                     type="text"
                     className="form-input font-mono"
-                    placeholder="e.g. Follow-up demo call with client"
+                    placeholder="e.g. Schedule commercial follow-up call..."
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     required
@@ -153,37 +283,54 @@ export default function TasksPage() {
                 </div>
 
                 <div className="form-group mb-3">
-                  <label className="form-label">Assign To Personnel</label>
-                  <select
-                    className="form-input font-mono"
-                    value={newAssignedTo}
-                    onChange={(e) => setNewAssignedTo(e.target.value)}
-                  >
-                    {companyStaff.map((staff) => (
-                      <option key={staff.userId} value={staff.userId}>
-                        {staff.name} ({staff.role})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group mb-3">
-                  <label className="form-label">Due Date / Time</label>
+                  <label className="form-label">Due Date / Deadline</label>
                   <input
                     type="text"
                     className="form-input font-mono"
-                    placeholder="e.g. Tomorrow, 4:00 PM"
+                    placeholder="e.g. Today, 4:00 PM"
                     value={newDueDate}
                     onChange={(e) => setNewDueDate(e.target.value)}
                   />
                 </div>
 
+                <div className="form-group mb-3">
+                  <label className="form-label">Priority</label>
+                  <select
+                    className="form-input font-mono"
+                    value={newPriority}
+                    onChange={(e) => setNewPriority(e.target.value)}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+
+                <div className="form-group mb-3">
+                  <label className="form-label">Assignee (Employee)</label>
+                  <select
+                    className="form-input font-mono"
+                    value={newAssignedTo}
+                    onChange={(e) => setNewAssignedTo(e.target.value)}
+                  >
+                    {companyStaff.map((u) => (
+                      <option key={u.userId} value={u.userId}>
+                        {u.name || u.fullName} ({u.userId}) - {u.role}
+                      </option>
+                    ))}
+                    {companyStaff.length === 0 && (
+                      <option value="employee">Default Staff (employee)</option>
+                    )}
+                  </select>
+                </div>
+
                 <div className="form-group">
-                  <label className="form-label">Related Client / Account</label>
+                  <label className="form-label">Related Context / Customer</label>
                   <input
                     type="text"
                     className="form-input font-mono"
-                    placeholder="e.g. Apex Global Logistics"
+                    placeholder="e.g. Acme Health or Regional Sales"
                     value={newRelatedTo}
                     onChange={(e) => setNewRelatedTo(e.target.value)}
                   />
@@ -194,15 +341,57 @@ export default function TasksPage() {
                 <button
                   type="button"
                   className="btn btn-secondary font-mono btn-sm"
+                  disabled={assigning}
                   onClick={() => setShowAssignModal(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary font-mono btn-sm">
-                  Assign Task
+                <button type="submit" className="btn btn-primary font-mono btn-sm" disabled={assigning}>
+                  {assigning ? 'Assigning...' : 'Assign Task'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.isOpen && (
+        <div className="sa-modal-backdrop" onClick={() => setDeleteModal({ isOpen: false, task: null })}>
+          <div className="sa-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="sa-modal-header">
+              <h3 className="sa-modal-title">Delete Task</h3>
+              <button
+                type="button"
+                className="sa-modal-close-btn"
+                onClick={() => setDeleteModal({ isOpen: false, task: null })}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="sa-modal-body">
+              <p>
+                Are you sure you want to delete task <strong>{deleteModal.task?.title}</strong>? This action cannot be undone.
+              </p>
+            </div>
+            <div className="sa-modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm font-mono"
+                disabled={deleting}
+                onClick={() => setDeleteModal({ isOpen: false, task: null })}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm font-mono"
+                disabled={deleting}
+                onClick={handleDeleteConfirm}
+              >
+                {deleting ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}

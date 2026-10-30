@@ -17,18 +17,26 @@ export default function AddCompany() {
     userLimit: 20,
     plan: 'Growth',
     billingCycle: 'Monthly',
-    status: 'Active'
+    status: 'Active',
+    trialPeriod: '14 Days'
   });
 
   const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
+
+  const [apiError, setApiError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
+    }
+    if (apiError) setApiError('');
+    if (serverError) {
+      setServerError(null);
     }
   };
 
@@ -38,35 +46,72 @@ export default function AddCompany() {
     if (!formData.email.trim()) {
       errs.email = 'Company Email is required.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errs.email = 'Please provide a valid email address.';
+      errs.email = 'Please provide a valid company email address.';
     }
     if (!formData.phone.trim()) {
       errs.phone = 'Company Phone is required.';
+    }
+    if (formData.adminEmail && formData.adminEmail.trim()) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.adminEmail.trim())) {
+        errs.adminEmail = 'Please provide a valid admin email address.';
+      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setServerError(null);
     if (!validate()) return;
 
     setIsSubmitting(true);
+    setApiError('');
 
-    // Pure React state update via SuperAdminContext (no API calls!)
-    setTimeout(() => {
-      const created = addCompany({
+    try {
+      const created = await addCompany({
         ...formData,
         adminName: formData.adminName || `${formData.name} Admin`,
         adminEmail: formData.adminEmail || formData.email
       });
       setIsSubmitting(false);
       setFeedbackSuccess(true);
+      const planPrices = {
+        Starter: '₹999 / mo',
+        Growth: '₹2,499 / mo',
+        Scale: '₹5,999 / mo'
+      };
 
+      const payload = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        address: formData.address ? formData.address.trim() : null,
+        plan: formData.plan,
+        billingCycle: formData.billingCycle,
+        price: planPrices[formData.plan] || '₹2,499 / mo',
+        userLimit: Number(formData.userLimit) || 20,
+        status: formData.status,
+        adminName: formData.adminName ? formData.adminName.trim() : `${formData.name.trim()} Admin`,
+        adminEmail: formData.adminEmail ? formData.adminEmail.trim() : formData.email.trim()
+      };
+
+      const created = await addCompany(payload);
+      setFeedbackSuccess(true);
       setTimeout(() => {
         navigate(`/super-admin/companies/${created.id}`);
       }, 700);
-    }, 400);
+    } catch (err) {
+      setIsSubmitting(false);
+      setApiError(err.message || 'Failed to create company. Please check your data.');
+        navigate(`/super-admin/companies/${created.id || ''}`);
+      }, 900);
+    } catch (err) {
+      console.error('Failed to provision company:', err);
+      setServerError(err.message || 'Failed to save company to MySQL database. Please verify connection.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -83,7 +128,7 @@ export default function AddCompany() {
           </Link>
           <h2 className="sa-form-title">Add Company</h2>
           <p className="sa-form-subtitle">
-            Create and configure a new company workspace.
+            Create and configure a new company workspace in Nexora CRM.
           </p>
         </div>
 
@@ -92,7 +137,24 @@ export default function AddCompany() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            <span>Company provisioned successfully in local state! Redirecting to company overview...</span>
+            <span>Company provisioned successfully! Redirecting to company overview...</span>
+          </div>
+        )}
+
+        {apiError && (
+            <span>Company saved successfully in MySQL! Redirecting...</span>
+          </div>
+        )}
+
+        {serverError && (
+          <div className="auth-alert alert-error font-mono mb-4" role="alert">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>{apiError}</span>
+            <span>{serverError}</span>
           </div>
         )}
 
@@ -114,7 +176,7 @@ export default function AddCompany() {
               </div>
               <div>
                 <h3 id="company-info-heading" className="sa-form-card-title">Company Information</h3>
-                <p className="sa-form-card-subtitle">Enter the basic details of the organization.</p>
+                <p className="sa-form-card-subtitle">Enter the basic organization and contact details.</p>
               </div>
             </header>
 
@@ -192,12 +254,12 @@ export default function AddCompany() {
                     onChange={handleChange}
                     required
                   />
-                  </div>
-                    {errors.phone && <span className="field-error font-mono">{errors.phone}</span>}
-                  </div>
+                </div>
+                {errors.phone && <span className="field-error font-mono">{errors.phone}</span>}
+              </div>
 
               {/* Company Address */}
-              <div className="form-group sa-form-grid-full">
+              <div className="form-group">
                 <label htmlFor="address" className="form-label">
                   <span>Company Address</span>
                   <span className="form-label-optional font-mono">Optional</span>
@@ -223,7 +285,74 @@ export default function AddCompany() {
             </div>
           </section>
 
-          {/* Card 2: Subscription & Licensing */}
+          {/* Card 2: Initial Company Administrator */}
+          <section className="sa-form-card" aria-labelledby="admin-info-heading">
+            <header className="sa-form-card-header">
+              <div className="sa-section-icon" aria-hidden="true">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+              <div>
+                <h3 id="admin-info-heading" className="sa-form-card-title">Company Administrator</h3>
+                <p className="sa-form-card-subtitle">Initial admin account for managing this company's workspace.</p>
+              </div>
+            </header>
+
+            <div className="sa-form-grid-2">
+              {/* Admin Name */}
+              <div className="form-group">
+                <label htmlFor="adminName" className="form-label">
+                  <span>Admin Name</span>
+                </label>
+                <div className="sa-input-wrapper">
+                  <span className="sa-input-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="7" r="4"></circle>
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    </svg>
+                  </span>
+                  <input
+                    id="adminName"
+                    type="text"
+                    name="adminName"
+                    className="form-input font-mono sa-input-with-icon"
+                    placeholder="e.g. Rahul Sharma"
+                    value={formData.adminName}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+
+              {/* Admin Email */}
+              <div className="form-group">
+                <label htmlFor="adminEmail" className="form-label">
+                  <span>Admin Email</span>
+                </label>
+                <div className="sa-input-wrapper">
+                  <span className="sa-input-icon" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                      <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                  </span>
+                  <input
+                    id="adminEmail"
+                    type="email"
+                    name="adminEmail"
+                    className={`form-input font-mono sa-input-with-icon ${errors.adminEmail ? 'input-error' : ''}`}
+                    placeholder="admin@apexdynamics.io"
+                    value={formData.adminEmail}
+                    onChange={handleChange}
+                  />
+                </div>
+                {errors.adminEmail && <span className="field-error font-mono">{errors.adminEmail}</span>}
+              </div>
+            </div>
+          </section>
+
+          {/* Card 3: Subscription & Licensing */}
           <section className="sa-form-card" aria-labelledby="subscription-licensing-heading">
             <header className="sa-form-card-header">
               <div className="sa-section-icon" aria-hidden="true">
@@ -234,15 +363,15 @@ export default function AddCompany() {
               </div>
               <div>
                 <h3 id="subscription-licensing-heading" className="sa-form-card-title">Subscription & Licensing</h3>
-                <p className="sa-form-card-subtitle">Configure the subscription plan and licensing details.</p>
+                <p className="sa-form-card-subtitle">Configure the subscription plan, billing cycle, and seat limit.</p>
               </div>
             </header>
 
             <div className="sa-form-grid-2">
               {/* Subscription Plan */}
-              <div className="form-group sa-form-grid-full">
+              <div className="form-group">
                 <label htmlFor="plan" className="form-label">
-                  <span>Subscription Plan</span>
+                  <span>Plan</span>
                 </label>
                 <select
                   id="plan"
@@ -251,9 +380,81 @@ export default function AddCompany() {
                   value={formData.plan}
                   onChange={handleChange}
                 >
-                  <option value="Starter">Starter (5 Team Members)</option>
-                  <option value="Growth">Growth (20 Team Members)</option>
-                  <option value="Scale">Scale (Unlimited Team Members)</option>
+                  <option value="Starter">Starter (5 Seats — ₹999/mo)</option>
+                  <option value="Growth">Growth (20 Seats — ₹2,499/mo)</option>
+                  <option value="Scale">Scale (Unlimited Seats — ₹5,999/mo)</option>
+                </select>
+              </div>
+
+              {/* Billing Cycle */}
+              <div className="form-group">
+                <label htmlFor="billingCycle" className="form-label">
+                  <span>Billing Cycle</span>
+                </label>
+                <select
+                  id="billingCycle"
+                  name="billingCycle"
+                  className="form-input font-mono"
+                  value={formData.billingCycle}
+                  onChange={handleChange}
+                >
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                  <option value="Annual">Annual (Save 20%)</option>
+                </select>
+              </div>
+
+              {/* User Limit */}
+              <div className="form-group">
+                <label htmlFor="userLimit" className="form-label">
+                  <span>User Limit (Seats)</span>
+                </label>
+                <input
+                  id="userLimit"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  name="userLimit"
+                  className="form-input font-mono"
+                  value={formData.userLimit}
+                  onChange={handleChange}
+                />
+              </div>
+
+              {/* Status */}
+              <div className="form-group">
+                <label htmlFor="status" className="form-label">
+                  <span>Status</span>
+                </label>
+                <select
+                  id="status"
+                  name="status"
+                  className="form-input font-mono"
+                  value={formData.status}
+                  onChange={handleChange}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Suspended">Suspended</option>
+                </select>
+              </div>
+
+              {/* Trial Period */}
+              <div className="form-group sa-form-grid-full">
+                <label htmlFor="trialPeriod" className="form-label">
+                  <span>Trial Period</span>
+                </label>
+                <select
+                  id="trialPeriod"
+                  name="trialPeriod"
+                  className="form-input font-mono"
+                  value={formData.trialPeriod}
+                  onChange={handleChange}
+                >
+                  <option value="None">None (Direct Activation)</option>
+                  <option value="7 Days">7 Days Free Trial</option>
+                  <option value="14 Days">14 Days Free Trial</option>
+                  <option value="30 Days">30 Days Free Trial</option>
                 </select>
               </div>
             </div>
@@ -277,7 +478,7 @@ export default function AddCompany() {
               {isSubmitting ? (
                 <span className="btn-loading-wrap">
                   <span className="spinner-dot"></span>
-                  <span>Provisioning...</span>
+                  <span>Saving to MySQL...</span>
                 </span>
               ) : (
                 'Create Company'

@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useSuperAdmin } from '../../context/SuperAdminContext';
 import { useTheme } from '../../context/ThemeContext';
+import { userApi } from '../../api/userApi';
 import AdminLayout from '../../components/SuperAdmin/AdminLayout';
 
 export default function SuperAdminSettings() {
@@ -10,6 +11,7 @@ export default function SuperAdminSettings() {
     setGeneralSettings,
     profileSettings,
     setProfileSettings,
+    saveProfileSettings,
     securitySettings,
     setSecuritySettings,
     notificationSettings,
@@ -74,20 +76,75 @@ export default function SuperAdminSettings() {
     showSaveSuccess('General');
   };
 
-  const handleProfileSave = (e) => {
+  const handleProfileSave = async (e) => {
     e.preventDefault();
-    setProfileSettings(profileForm);
-    showSaveSuccess('Profile');
+    try {
+      if (saveProfileSettings) {
+        await saveProfileSettings(profileForm);
+      } else {
+        setProfileSettings(profileForm);
+      }
+      showSaveSuccess('Profile');
+    } catch (err) {
+      alert(err.message || 'Failed to save profile');
+    }
   };
 
-  const handlePasswordSave = (e) => {
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+
+  const handlePasswordSave = async (e) => {
     e.preventDefault();
-    if (securityPassword.newPassword !== securityPassword.confirmPassword) {
-      alert('New passwords do not match.');
+    setPasswordError('');
+
+    if (!securityPassword.currentPassword) {
+      setPasswordError('Current password is required.');
       return;
     }
-    setSecurityPassword({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    showSaveSuccess('Security password');
+
+    if (!securityPassword.newPassword) {
+      setPasswordError('New password is required.');
+      return;
+    }
+
+    if (securityPassword.newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+
+    if (securityPassword.newPassword !== securityPassword.confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    if (securityPassword.newPassword === securityPassword.currentPassword) {
+      setPasswordError('New password cannot be the same as the current password.');
+      return;
+    }
+    try {
+      await userApi.changePassword({
+        currentPassword: securityPassword.currentPassword,
+        newPassword: securityPassword.newPassword
+      });
+      setSecurityPassword({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showSaveSuccess('Security password');
+    } catch (err) {
+      alert(err.message || 'Failed to update password');
+
+    setPasswordSubmitting(true);
+    try {
+      await userApi.changePassword({
+        currentPassword: securityPassword.currentPassword,
+        oldPassword: securityPassword.currentPassword,
+        newPassword: securityPassword.newPassword
+      });
+      setSecurityPassword({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showSaveSuccess('Password updated successfully');
+    } catch (err) {
+      setPasswordError(err.message || 'Failed to update password. Please check your current password.');
+    } finally {
+      setPasswordSubmitting(false);
+    }
   };
 
   const toggleNotification = (key) => {
@@ -495,9 +552,14 @@ export default function SuperAdminSettings() {
                     />
                   </div>
                 </div>
+                {passwordError && (
+                  <div className="alert alert-error font-mono mb-4" style={{ color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem' }}>
+                    {passwordError}
+                  </div>
+                )}
                 <div className="sa-form-footer sa-security-pw-footer mt-5">
-                  <button type="submit" className="btn btn-primary font-mono sa-btn-security">
-                    Update Password
+                  <button type="submit" disabled={passwordSubmitting} className="btn btn-primary font-mono sa-btn-security">
+                    {passwordSubmitting ? 'Updating...' : 'Update Password'}
                   </button>
                 </div>
               </form>

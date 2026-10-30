@@ -19,22 +19,28 @@ export default function SuperAdminDashboard() {
   // Preview the first 5 recent companies
   const recentCompanies = companies.slice(0, 5);
 
-  // SVG Chart calculation for mock revenue
+  // SVG Chart calculation for revenue
   const maxRevenue = 900000;
   const chartHeight = 160;
   const chartWidth = 500;
-  const points = revenueMonthlyData.map((d, index) => {
-    const x = (index / (revenueMonthlyData.length - 1)) * (chartWidth - 60) + 30;
-    const y = chartHeight - (d.revenue / maxRevenue) * (chartHeight - 30) - 15;
+  const safeData = Array.isArray(revenueMonthlyData) ? revenueMonthlyData : [];
+  const points = safeData.map((d, index) => {
+    const divisor = safeData.length > 1 ? safeData.length - 1 : 1;
+    const x = (index / divisor) * (chartWidth - 60) + 30;
+    const y = chartHeight - ((d.revenue || 0) / maxRevenue) * (chartHeight - 30) - 15;
     return { x, y, ...d };
   });
 
-  const pathD = points.reduce(
-    (acc, pt, idx) => (idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`),
-    ''
-  );
+  const pathD = points.length > 0
+    ? points.reduce(
+        (acc, pt, idx) => (idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`),
+        ''
+      )
+    : '';
 
-  const areaD = `${pathD} L ${points[points.length - 1].x} ${chartHeight} L ${points[0].x} ${chartHeight} Z`;
+  const areaD = points.length > 0
+    ? `${pathD} L ${points[points.length - 1].x} ${chartHeight} L ${points[0].x} ${chartHeight} Z`
+    : '';
 
   return (
     <AdminLayout title="Platform Command Dashboard" breadcrumb={['Dashboard']}>
@@ -296,8 +302,8 @@ export default function SuperAdminDashboard() {
                         </div>
                       </td>
                       <td>
-                        <div className="sa-owner-name">{comp.owner.name}</div>
-                        <div className="sa-owner-email font-mono">{comp.owner.email}</div>
+                        <div className="sa-owner-name">{comp.owner?.name || 'Admin'}</div>
+                        <div className="sa-owner-email font-mono">{comp.owner?.email || comp.email}</div>
                       </td>
                       <td>
                         <span className="sa-plan-pill font-mono">{comp.plan}</span>
@@ -348,7 +354,7 @@ export default function SuperAdminDashboard() {
                   <div className="sa-mobile-card-details font-mono">
                     <div className="sa-mobile-meta-row">
                       <span className="sa-meta-lbl">Admin:</span>
-                      <span className="sa-meta-val">{comp.owner.name}</span>
+                      <span className="sa-meta-val">{comp.owner?.name || 'Admin'}</span>
                     </div>
                     <div className="sa-mobile-meta-row">
                       <span className="sa-meta-lbl">Plan:</span>

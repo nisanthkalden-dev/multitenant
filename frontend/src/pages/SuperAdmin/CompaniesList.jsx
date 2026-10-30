@@ -5,7 +5,7 @@ import AdminLayout from '../../components/SuperAdmin/AdminLayout';
 import StatusBadge from '../../components/SuperAdmin/StatusBadge';
 
 export default function CompaniesList() {
-  const { companies, updateCompanyStatus, deleteCompany } = useSuperAdmin();
+  const { companies, loading, updateCompanyStatus, deleteCompany } = useSuperAdmin();
 
   // Filters & Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,10 +28,10 @@ export default function CompaniesList() {
         const query = searchQuery.toLowerCase().trim();
         const matchesSearch =
           !query ||
-          comp.name.toLowerCase().includes(query) ||
-          comp.owner.name.toLowerCase().includes(query) ||
-          comp.owner.email.toLowerCase().includes(query) ||
-          comp.domain.toLowerCase().includes(query);
+          comp.name?.toLowerCase().includes(query) ||
+          comp.owner?.name?.toLowerCase().includes(query) ||
+          comp.owner?.email?.toLowerCase().includes(query) ||
+          comp.domain?.toLowerCase().includes(query);
 
         // Status filter
         const matchesStatus =
@@ -52,19 +52,29 @@ export default function CompaniesList() {
       });
   }, [companies, searchQuery, statusFilter, planFilter, sortBy]);
 
-  const handleActionConfirm = () => {
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  const handleActionConfirm = async () => {
     if (!actionModal.company) return;
     const { company, type } = actionModal;
+    setActionLoading(true);
+    setActionError('');
 
-    if (type === 'suspend') {
-      updateCompanyStatus(company.id, 'Suspended');
-    } else if (type === 'activate') {
-      updateCompanyStatus(company.id, 'Active');
-    } else if (type === 'delete') {
-      deleteCompany(company.id);
+    try {
+      if (type === 'suspend') {
+        await updateCompanyStatus(company.id, 'Suspended');
+      } else if (type === 'activate') {
+        await updateCompanyStatus(company.id, 'Active');
+      } else if (type === 'delete') {
+        await deleteCompany(company.id);
+      }
+      setActionModal({ isOpen: false, type: null, company: null });
+    } catch (err) {
+      setActionError(err.message || 'Operation failed');
+    } finally {
+      setActionLoading(false);
     }
-
-    setActionModal({ isOpen: false, type: null, company: null });
   };
 
   return (
@@ -221,8 +231,8 @@ export default function CompaniesList() {
                         </div>
                       </td>
                       <td>
-                        <div className="sa-owner-name">{comp.owner.name}</div>
-                        <div className="sa-owner-email font-mono">{comp.owner.email}</div>
+                        <div className="sa-owner-name">{comp.owner?.name || 'Admin'}</div>
+                        <div className="sa-owner-email font-mono">{comp.owner?.email || comp.email}</div>
                       </td>
                       <td>
                         <span className="sa-plan-pill font-mono">{comp.plan}</span>
@@ -330,7 +340,7 @@ export default function CompaniesList() {
                   <div className="sa-mobile-card-details font-mono">
                     <div className="sa-mobile-meta-row">
                       <span className="sa-meta-lbl">Admin:</span>
-                      <span className="sa-meta-val">{comp.owner.name}</span>
+                      <span className="sa-meta-val">{comp.owner?.name || 'Admin'}</span>
                     </div>
                     <div className="sa-mobile-meta-row">
                       <span className="sa-meta-lbl">Plan:</span>
@@ -428,15 +438,21 @@ export default function CompaniesList() {
                 )}
                 {actionModal.type === 'delete' && (
                   <>
-                    Are you sure you want to remove <strong>{actionModal.company?.name}</strong> from the local platform registry? This is a frontend demo interaction.
+                    Are you sure you want to deactivate <strong>{actionModal.company?.name}</strong>? This action will suspend access and persist in the database.
                   </>
                 )}
               </p>
+              {actionError && (
+                <div className="auth-alert alert-error font-mono mt-3">
+                  <span>{actionError}</span>
+                </div>
+              )}
             </div>
             <div className="sa-modal-footer">
               <button
                 type="button"
                 className="btn btn-secondary btn-sm font-mono"
+                disabled={actionLoading}
                 onClick={() => setActionModal({ isOpen: false, type: null, company: null })}
               >
                 Cancel
@@ -448,11 +464,14 @@ export default function CompaniesList() {
                     ? 'btn-danger'
                     : 'btn-primary'
                 }`}
+                disabled={actionLoading}
                 onClick={handleActionConfirm}
               >
-                {actionModal.type === 'suspend' && 'Confirm Suspension'}
-                {actionModal.type === 'activate' && 'Confirm Activation'}
-                {actionModal.type === 'delete' && 'Confirm Delete'}
+                {actionLoading ? 'Processing...' : (
+                  actionModal.type === 'suspend' ? 'Confirm Suspension' :
+                  actionModal.type === 'activate' ? 'Confirm Activation' :
+                  'Confirm Delete'
+                )}
               </button>
             </div>
           </div>
