@@ -38,10 +38,22 @@ export const userApi = {
   },
 
   // Current User profile updates
+  getProfile: async () => {
+    const res = await apiClient('/users/me');
+    return res;
+  },
+
   updateProfile: async (profileData) => {
     const res = await apiClient('/users/me', {
       method: 'PUT',
       body: profileData
+    });
+    return res.data;
+  },
+
+  removeAvatar: async () => {
+    const res = await apiClient('/users/me/avatar', {
+      method: 'DELETE'
     });
     return res.data;
   },

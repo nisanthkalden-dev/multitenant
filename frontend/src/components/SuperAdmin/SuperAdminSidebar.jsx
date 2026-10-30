@@ -5,7 +5,7 @@ import { useSuperAdmin } from '../../context/SuperAdminContext';
 
 export default function SuperAdminSidebar({ mobileOpen, onCloseMobile }) {
   const { logout } = useAuth();
-  const { generalSettings } = useSuperAdmin();
+  const { generalSettings, companies, stats } = useSuperAdmin();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -132,7 +132,7 @@ export default function SuperAdminSidebar({ mobileOpen, onCloseMobile }) {
               <span className="font-mono">GLOBAL CLUSTER</span>
             </div>
             <div className="sa-cluster-info font-mono">
-              248 Tenants &bull; 99.98% SLA
+              {stats?.activeCompanies?.value ? `${stats.activeCompanies.value} Active Tenants` : `${companies.length} ${companies.length === 1 ? 'Tenant Workspace' : 'Tenant Workspaces'}`}
             </div>
           </div>
 

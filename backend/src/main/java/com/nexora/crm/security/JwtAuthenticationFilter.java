@@ -23,10 +23,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
-    public JwtAuthenticationFilter(JwtService jwtService, CustomUserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService, CustomUserDetailsService userDetailsService, com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -54,14 +56,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = this.userDetailsService.loadUserByUsername(email);
 
-                    if (userDetails != null && userDetails.isEnabled()) {
-                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    if (userDetails instanceof CustomUserDetails customUser) {
+                        // PART 3: If user belongs to a company that is currently suspended, immediately block access
+                        if (customUser.getRole() != com.nexora.crm.entity.RoleType.SUPER_ADMIN && customUser.isCompanySuspended()) {
+                            log.warn("Blocked request for user '{}' because company '{}' is suspended", email, customUser.getCompanyId());
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType(org.springframework.http.MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            com.nexora.crm.dto.common.ApiResponse<Object> errorResponse = com.nexora.crm.dto.common.ApiResponse.error(
+                                    "Your company account is suspended. Please contact the administrator.",
+                                    HttpServletResponse.SC_FORBIDDEN
+                            );
+                            objectMapper.writeValue(response.getWriter(), errorResponse);
+                            response.getWriter().flush();
+                            return;
+                        }
+
+                        if (customUser.isEnabled()) {
+                            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                    customUser,
+                                    null,
+                                    customUser.getAuthorities()
+                            );
+                            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                            SecurityContextHolder.getContext().setAuthentication(authToken);
+                        }
                     }
                 }
             } else {

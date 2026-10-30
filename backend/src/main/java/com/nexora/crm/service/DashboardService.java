@@ -3,14 +3,21 @@ package com.nexora.crm.service;
 import com.nexora.crm.dto.dashboard.CompanyDashboardDto;
 import com.nexora.crm.dto.dashboard.SuperAdminDashboardDto;
 import com.nexora.crm.entity.Activity;
+import com.nexora.crm.entity.Company;
 import com.nexora.crm.entity.Lead;
 import com.nexora.crm.entity.Subscription;
 import com.nexora.crm.entity.Task;
 import com.nexora.crm.repository.*;
 import com.nexora.crm.security.TenantContext;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -47,81 +54,178 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public SuperAdminDashboardDto getSuperAdminDashboard() {
+        return getSuperAdminDashboard("6M");
+    }
+
+    @Transactional(readOnly = true)
+    public SuperAdminDashboardDto getSuperAdminDashboard(String period) {
         SuperAdminDashboardDto dto = new SuperAdminDashboardDto();
 
         long totalCompanies = companyRepository.count();
         long activeCompanies = companyRepository.countByStatusIgnoreCase("Active");
+        long suspendedCompanies = companyRepository.countByStatusIgnoreCase("Suspended");
         long totalUsers = userRepository.count();
+
+        // Active subscriptions in MySQL
         long activeSubscriptions = subscriptionRepository.countByStatusIgnoreCase("Active");
 
-        // Calculate actual MRR from active subscriptions in MySQL
-        List<Subscription> allSubs = subscriptionRepository.findAll();
-        long totalRevenue = 0;
+        // Fetch all companies to calculate strictly real MRR from active companies
+        List<Company> allCompanies = companyRepository.findAll();
+
+        long currentMrr = 0;
         int starterCount = 0;
         int growthCount = 0;
         int scaleCount = 0;
 
-        for (Subscription s : allSubs) {
-            String planName = s.getPlanName() != null ? s.getPlanName().toLowerCase() : "";
-            if (planName.contains("starter")) starterCount++;
-            else if (planName.contains("scale")) scaleCount++;
-            else growthCount++;
+        for (Company c : allCompanies) {
+            boolean isActiveCompany = "Active".equalsIgnoreCase(c.getStatus()) && Boolean.TRUE.equals(c.getIsActive());
+            if (isActiveCompany) {
+                String plan = c.getPlan() != null ? c.getPlan().toLowerCase() : "";
+                if (plan.contains("starter")) starterCount++;
+                else if (plan.contains("scale")) scaleCount++;
+                else growthCount++;
 
-            // Extract numeric price if present
-            String amt = s.getAmount() != null ? s.getAmount().replaceAll("[^0-9]", "") : "";
-            if (!amt.isBlank()) {
-                try {
-                    long val = Long.parseLong(amt);
-                    if ("Annual".equalsIgnoreCase(s.getBillingCycle())) {
-                        totalRevenue += val / 12;
-                    } else {
-                        totalRevenue += val;
-                    }
-                } catch (NumberFormatException ignored) {}
+                long numericPrice = parseNumericPrice(c.getPrice());
+                if ("Annual".equalsIgnoreCase(c.getBillingCycle())) {
+                    currentMrr += Math.round(numericPrice / 12.0);
+                } else {
+                    currentMrr += numericPrice;
+                }
             }
         }
 
-        String mrrDisplay = totalRevenue > 0 ? "₹" + String.format("%,d", totalRevenue) : "₹0";
-        long totalSubCount = allSubs.size();
+        // Calculate previous month MRR:
+        // Companies active today that were created before the current calendar month began
+        YearMonth currentYm = YearMonth.now(ZoneId.systemDefault());
+        Instant startOfCurrentMonth = currentYm.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+
+        long previousMrr = 0;
+        for (Company c : allCompanies) {
+            boolean isActiveCompany = "Active".equalsIgnoreCase(c.getStatus()) && Boolean.TRUE.equals(c.getIsActive());
+            if (isActiveCompany && c.getCreatedAt() != null && c.getCreatedAt().isBefore(startOfCurrentMonth)) {
+                long numericPrice = parseNumericPrice(c.getPrice());
+                if ("Annual".equalsIgnoreCase(c.getBillingCycle())) {
+                    previousMrr += Math.round(numericPrice / 12.0);
+                } else {
+                    previousMrr += numericPrice;
+                }
+            }
+        }
+
+        // Percentage change: ((current - previous) / previous) * 100
+        String growthStr = "0.0%";
+        String trend = "neutral";
+        if (previousMrr > 0) {
+            double pct = ((double) (currentMrr - previousMrr) / previousMrr) * 100.0;
+            growthStr = String.format(Locale.US, "%+.1f%%", pct);
+            trend = pct > 0 ? "up" : (pct < 0 ? "down" : "neutral");
+        } else {
+            // Insufficient prior period records to compare against; safely return 0.0% instead of fabricating +100%
+            growthStr = "0.0%";
+            trend = "neutral";
+        }
+
+        String mrrDisplay = currentMrr > 0 ? "₹" + String.format(Locale.US, "%,d", currentMrr) : "₹0";
 
         Map<String, SuperAdminDashboardDto.StatItem> stats = new HashMap<>();
-        stats.put("totalCompanies", new SuperAdminDashboardDto.StatItem(String.valueOf(totalCompanies), totalCompanies > 0 ? "+100%" : "0%", "up"));
-        stats.put("activeCompanies", new SuperAdminDashboardDto.StatItem(String.valueOf(activeCompanies), activeCompanies > 0 ? "+100%" : "0%", "up"));
-        stats.put("totalUsers", new SuperAdminDashboardDto.StatItem(String.valueOf(totalUsers), totalUsers > 0 ? "+100%" : "0%", "up"));
-        stats.put("activeSubscriptions", new SuperAdminDashboardDto.StatItem(String.valueOf(activeSubscriptions), activeSubscriptions > 0 ? "+100%" : "0%", "up"));
-        stats.put("monthlyRevenue", new SuperAdminDashboardDto.StatItem(mrrDisplay, totalRevenue > 0 ? "+12.5%" : "0%", "up"));
-        stats.put("avgSubscriptionValue", new SuperAdminDashboardDto.StatItem(totalSubCount > 0 ? "₹" + String.format("%,d", totalRevenue / totalSubCount) : "₹0", "0%", "neutral"));
+        stats.put("totalCompanies", new SuperAdminDashboardDto.StatItem(String.valueOf(totalCompanies), growthStr, trend));
+        stats.put("activeCompanies", new SuperAdminDashboardDto.StatItem(String.valueOf(activeCompanies), growthStr, trend));
+        stats.put("totalUsers", new SuperAdminDashboardDto.StatItem(String.valueOf(totalUsers), "0.0%", "neutral"));
+        stats.put("activeSubscriptions", new SuperAdminDashboardDto.StatItem(String.valueOf(activeSubscriptions), growthStr, trend));
+        stats.put("monthlyRevenue", new SuperAdminDashboardDto.StatItem(mrrDisplay, growthStr, trend));
+        stats.put("avgSubscriptionValue", new SuperAdminDashboardDto.StatItem(
+                activeCompanies > 0 ? "₹" + String.format(Locale.US, "%,d", currentMrr / activeCompanies) : "₹0",
+                "0.0%", "neutral"));
 
         dto.setStats(stats);
+        dto.setCurrentMrr(currentMrr);
+        dto.setPreviousMrr(previousMrr);
+        dto.setRevenueGrowth(growthStr);
+        dto.setTotalCompaniesCount(totalCompanies);
+        dto.setActiveCompaniesCount(activeCompanies);
+        dto.setSuspendedCompaniesCount(suspendedCompanies);
+        dto.setActiveSubscriptionsCount(activeSubscriptions);
+        dto.setTotalUsersCount(totalUsers);
 
-        // Revenue chart
-        List<Map<String, Object>> rev = new ArrayList<>();
-        String[] months = {"May", "Jun", "Jul", "Aug", "Sep", "Oct"};
-        for (int i = 0; i < months.length; i++) {
-            long monthRev = (i == months.length - 1) ? totalRevenue : Math.round(totalRevenue * (0.5 + (i * 0.1)));
-            rev.add(Map.of("month", months[i], "revenue", monthRev));
-        }
-        dto.setRevenueMonthlyData(rev);
+        // Compute 6M and 1Y series dynamically from real database company records
+        List<Map<String, Object>> rev6M = computeHistoricalRevenue(allCompanies, 6, currentYm);
+        List<Map<String, Object>> rev1Y = computeHistoricalRevenue(allCompanies, 12, currentYm);
+        dto.setRevenueMonthlyData6M(rev6M);
+        dto.setRevenueMonthlyData1Y(rev1Y);
+        dto.setRevenueMonthlyData("1Y".equalsIgnoreCase(period) ? rev1Y : rev6M);
 
-        // Subscription distribution from actual records
+        // Subscription distribution from actual active companies
         List<Map<String, Object>> dist = new ArrayList<>();
-        int starterPct = totalSubCount > 0 ? Math.round((starterCount * 100.0f) / totalSubCount) : 0;
-        int growthPct = totalSubCount > 0 ? Math.round((growthCount * 100.0f) / totalSubCount) : 0;
-        int scalePct = totalSubCount > 0 ? Math.max(0, 100 - starterPct - growthPct) : 0;
+        int totalActivePlans = starterCount + growthCount + scaleCount;
+        int starterPct = totalActivePlans > 0 ? Math.round((starterCount * 100.0f) / totalActivePlans) : 0;
+        int growthPct = totalActivePlans > 0 ? Math.round((growthCount * 100.0f) / totalActivePlans) : 0;
+        int scalePct = totalActivePlans > 0 ? Math.max(0, 100 - starterPct - growthPct) : 0;
 
         dist.add(Map.of("plan", "Starter", "count", starterCount, "percentage", starterPct, "color", "#64748b"));
         dist.add(Map.of("plan", "Growth", "count", growthCount, "percentage", growthPct, "color", "#00d4b8"));
         dist.add(Map.of("plan", "Scale", "count", scaleCount, "percentage", scalePct, "color", "#8b5cf6"));
         dto.setSubscriptionDistribution(dist);
 
-        // Platform activities
-        List<Map<String, Object>> activities = new ArrayList<>();
-        activities.add(Map.of("id", 1, "type", "company_joined", "title", "New Organization Registered", "description", "Acme Corporation completed workspace onboarding", "timestamp", "15 minutes ago"));
-        activities.add(Map.of("id", 2, "type", "subscription_upgraded", "title", "Subscription Upgraded", "description", "Zenith Health Systems upgraded to Scale annual plan", "timestamp", "2 hours ago"));
-        activities.add(Map.of("id", 3, "type", "admin_created", "title", "Security Check Completed", "description", "Multi-tenant isolation checks verified clean across all tenants", "timestamp", "4 hours ago"));
-        dto.setPlatformRecentActivities(activities);
+        // Platform activities from actual recent audit activities
+        List<Activity> recentActs = activityRepository.findAll(PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"))).getContent();
+        List<Map<String, Object>> actList = new ArrayList<>();
+        if (!recentActs.isEmpty()) {
+            for (Activity a : recentActs) {
+                Map<String, Object> item = new HashMap<>();
+                item.put("id", a.getId());
+                item.put("type", a.getActivityType() != null ? a.getActivityType() : "company_joined");
+                item.put("title", a.getAction());
+                item.put("description", (a.getUserName() != null ? a.getUserName() + " - " : "") + (a.getTarget() != null ? a.getTarget() : ""));
+                item.put("timestamp", a.getCreatedAt() != null ? a.getCreatedAt().toString() : "Recently");
+                actList.add(item);
+            }
+        } else {
+            actList.add(Map.of("id", 1, "type", "company_joined", "title", "Platform Initialized", "description", "Database tenant isolation confirmed active", "timestamp", "Just now"));
+        }
+        dto.setPlatformRecentActivities(actList);
 
         return dto;
+    }
+
+    private List<Map<String, Object>> computeHistoricalRevenue(List<Company> companies, int monthsCount, YearMonth currentYm) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        DateTimeFormatter monthFmt = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH);
+
+        for (int i = monthsCount - 1; i >= 0; i--) {
+            YearMonth ym = currentYm.minusMonths(i);
+            Instant endOfMonth = ym.atEndOfMonth().atTime(23, 59, 59).atZone(ZoneId.systemDefault()).toInstant();
+
+            long monthRevenue = 0;
+            for (Company c : companies) {
+                if ("Active".equalsIgnoreCase(c.getStatus()) && Boolean.TRUE.equals(c.getIsActive())) {
+                    if (c.getCreatedAt() == null || !c.getCreatedAt().isAfter(endOfMonth)) {
+                        long numericPrice = parseNumericPrice(c.getPrice());
+                        if ("Annual".equalsIgnoreCase(c.getBillingCycle())) {
+                            monthRevenue += Math.round(numericPrice / 12.0);
+                        } else {
+                            monthRevenue += numericPrice;
+                        }
+                    }
+                }
+            }
+
+            Map<String, Object> item = new HashMap<>();
+            item.put("month", ym.format(monthFmt));
+            item.put("revenue", monthRevenue);
+            result.add(item);
+        }
+        return result;
+    }
+
+    private long parseNumericPrice(String price) {
+        if (price == null || price.isBlank()) return 0;
+        String digits = price.replaceAll("[^0-9]", "");
+        if (digits.isBlank()) return 0;
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     @Transactional(readOnly = true)

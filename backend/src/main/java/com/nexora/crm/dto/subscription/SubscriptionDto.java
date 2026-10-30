@@ -6,12 +6,14 @@ public class SubscriptionDto {
     private String id;
     private String companyId;
     private String companyName;
+    private String companyStatus;
 
     @NotBlank(message = "Plan name is required")
     private String plan;
 
     private String billingCycle = "Monthly";
     private String amount;
+    private java.math.BigDecimal price;
     private String status = "Active";
     private String startDate;
     private String renewalDate;
@@ -43,6 +45,14 @@ public class SubscriptionDto {
         this.companyName = companyName;
     }
 
+    public String getCompanyStatus() {
+        return companyStatus;
+    }
+
+    public void setCompanyStatus(String companyStatus) {
+        this.companyStatus = companyStatus;
+    }
+
     public String getPlan() {
         return plan;
     }
@@ -65,6 +75,14 @@ public class SubscriptionDto {
 
     public void setAmount(String amount) {
         this.amount = amount;
+    }
+
+    public java.math.BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(java.math.BigDecimal price) {
+        this.price = price;
     }
 
     public String getStatus() {

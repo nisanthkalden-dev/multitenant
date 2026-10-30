@@ -30,7 +30,7 @@ public class Company {
     @Column(name = "billing_cycle", nullable = false)
     private String billingCycle = "Monthly";
 
-    private String price = "₹2,499 / mo";
+    private String price = "₹2,499";
 
     @Column(nullable = false)
     private String status = "Active";

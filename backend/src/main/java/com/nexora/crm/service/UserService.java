@@ -177,18 +177,77 @@ public class UserService {
 
     @Transactional
     public UserSummaryDto updateCurrentUserProfile(UserUpdateRequest request) {
-        String currentUserId = tenantContext.getCurrentUserId();
-        User user = userRepository.findByUserIdIgnoreCase(currentUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + currentUserId));
+        CustomUserDetails userDetails = tenantContext.getCurrentUserDetails();
+        if (userDetails == null) {
+            throw new ResourceNotFoundException("No authenticated security context found.");
+        }
 
-        if (request.getName() != null) user.setFullName(request.getName().trim());
-        if (request.getEmail() != null) user.setEmail(request.getEmail().trim().toLowerCase());
-        if (request.getPhone() != null) user.setPhone(request.getPhone().trim());
-        if (request.getDepartment() != null) user.setDepartment(request.getDepartment().trim());
+        User user = null;
+        if (userDetails.getEmail() != null && !userDetails.getEmail().isBlank()) {
+            user = userRepository.findByEmailIgnoreCase(userDetails.getEmail()).orElse(null);
+        }
+        if (user == null && userDetails.getUserId() != null && !userDetails.getUserId().isBlank()) {
+            user = userRepository.findByUserIdIgnoreCase(userDetails.getUserId()).orElse(null);
+        }
+        if (user == null && userDetails.getId() != null) {
+            user = userRepository.findById(userDetails.getId()).orElse(null);
+        }
+
+        if (user == null) {
+            throw new ResourceNotFoundException("Authenticated user not found in database");
+        }
+
+        if (request.getName() != null && !request.getName().trim().isBlank()) {
+            user.setFullName(request.getName().trim());
+        }
+        if (request.getEmail() != null && !request.getEmail().trim().isBlank()) {
+            String newEmail = request.getEmail().trim().toLowerCase();
+            if (!newEmail.equalsIgnoreCase(user.getEmail()) && userRepository.existsByEmailIgnoreCase(newEmail)) {
+                throw new DuplicateResourceException("Email '" + newEmail + "' is already in use by another account.");
+            }
+            user.setEmail(newEmail);
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone().trim());
+        }
+        if (request.getDepartment() != null) {
+            user.setDepartment(request.getDepartment().trim());
+        }
+        if (request.getAvatar() != null) {
+            String av = request.getAvatar().trim();
+            user.setAvatar(av.isEmpty() ? null : av);
+        }
         // Users cannot change their own role
 
         User updated = userRepository.save(user);
         return authService.mapToSummary(updated);
+    }
+
+    @Transactional
+    public UserSummaryDto removeCurrentUserAvatar() {
+        CustomUserDetails userDetails = tenantContext.getCurrentUserDetails();
+        if (userDetails == null) {
+            throw new ResourceNotFoundException("No authenticated security context found.");
+        }
+
+        User user = null;
+        if (userDetails.getEmail() != null && !userDetails.getEmail().isBlank()) {
+            user = userRepository.findByEmailIgnoreCase(userDetails.getEmail()).orElse(null);
+        }
+        if (user == null && userDetails.getUserId() != null && !userDetails.getUserId().isBlank()) {
+            user = userRepository.findByUserIdIgnoreCase(userDetails.getUserId()).orElse(null);
+        }
+        if (user == null && userDetails.getId() != null) {
+            user = userRepository.findById(userDetails.getId()).orElse(null);
+        }
+
+        if (user == null) {
+            throw new ResourceNotFoundException("Authenticated user not found in database");
+        }
+
+        user.setAvatar(null);
+        User saved = userRepository.save(user);
+        return authService.mapToSummary(saved);
     }
 
     @Transactional

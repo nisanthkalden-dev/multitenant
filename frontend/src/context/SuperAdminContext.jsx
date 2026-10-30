@@ -36,6 +36,8 @@ export function SuperAdminProvider({ children }) {
   const [activities, setActivities] = useState(platformRecentActivities);
   const [stats, setStats] = useState(superAdminStats);
   const [revenueData, setRevenueData] = useState(revenueMonthlyData);
+  const [revenueData6M, setRevenueData6M] = useState(null);
+  const [revenueData1Y, setRevenueData1Y] = useState(null);
   const [distributionData, setDistributionData] = useState(subscriptionDistribution);
 
   const [loading, setLoading] = useState(false);
@@ -151,26 +153,70 @@ export function SuperAdminProvider({ children }) {
   // Fetch Plans from Backend
   const refreshPlans = useCallback(async () => {
     try {
-      const availablePlans = await subscriptionApi.getPlans();
+      const availablePlans = await subscriptionApi.getSuperAdminPlans();
       if (Array.isArray(availablePlans) && availablePlans.length > 0) {
         setPlans(availablePlans);
       }
     } catch (err) {
-      // Fallback to static plan configuration
+      // Fallback
+    }
+  }, []);
+
+  // Fetch Platform Settings from Backend
+  const refreshSettings = useCallback(async () => {
+    try {
+      const { platformSettingsApi } = await import('../api/platformSettingsApi');
+      const settings = await platformSettingsApi.getSettings();
+      if (settings) {
+        setGeneralSettings(prev => ({
+          ...prev,
+          platformName: settings.platformName || prev.platformName,
+          platformEmail: settings.platformEmail || prev.platformEmail,
+          supportPhone: settings.supportPhone || prev.supportPhone,
+          defaultCurrency: settings.defaultCurrency || prev.defaultCurrency,
+          defaultTimezone: settings.defaultTimezone || prev.defaultTimezone,
+          dateFormat: settings.dateFormat || prev.dateFormat,
+          logoUrl: settings.logoUrl || null
+        }));
+      }
+    } catch (err) {
+      console.warn('Could not fetch platform settings from backend:', err.message);
     }
   }, []);
 
   // Fetch Dashboard Metrics from Backend
-  const refreshDashboard = useCallback(async () => {
+  const refreshDashboard = useCallback(async (period = '6M') => {
     try {
-      const dashboard = await dashboardApi.getSuperAdminDashboard();
+      const dashboard = await dashboardApi.getSuperAdminDashboard(period);
       if (dashboard) {
         if (dashboard.stats) setStats(dashboard.stats);
         if (dashboard.revenueMonthlyData) setRevenueData(dashboard.revenueMonthlyData);
+        if (dashboard.revenueMonthlyData6M) setRevenueData6M(dashboard.revenueMonthlyData6M);
+        if (dashboard.revenueMonthlyData1Y) setRevenueData1Y(dashboard.revenueMonthlyData1Y);
         if (dashboard.subscriptionDistribution) setDistributionData(dashboard.subscriptionDistribution);
       }
     } catch (err) {
       console.warn('Could not fetch super admin dashboard stats:', err.message);
+    }
+  }, []);
+
+  // Fetch Current Super Admin Profile from Backend
+  const refreshProfile = useCallback(async () => {
+    try {
+      const { userApi } = await import('../api/userApi');
+      const res = await userApi.getProfile();
+      if (res && res.data) {
+        const u = res.data;
+        setProfileSettings({
+          fullName: u.fullName || u.name || 'Platform Super Admin',
+          email: u.email || 'superadmin@nexora.com',
+          phone: u.phone || '+91 98765 43210',
+          userId: u.userId || 'superadmin',
+          avatarUrl: u.avatar && u.avatar.length > 5 ? u.avatar : null
+        });
+      }
+    } catch (err) {
+      console.warn('Could not fetch user profile:', err.message);
     }
   }, []);
 
@@ -182,6 +228,8 @@ export function SuperAdminProvider({ children }) {
         refreshCompanies(),
         refreshSubscriptions(),
         refreshPlans(),
+        refreshSettings(),
+        refreshProfile(),
         refreshDashboard()
       ]);
     } catch (err) {
@@ -189,6 +237,7 @@ export function SuperAdminProvider({ children }) {
     } finally {
       setLoading(false);
     }
+  }, [refreshCompanies, refreshSubscriptions, refreshPlans, refreshSettings, refreshProfile, refreshDashboard]);
   }, [role]);
 
   useEffect(() => {
@@ -283,6 +332,58 @@ export function SuperAdminProvider({ children }) {
     return updated;
   };
 
+  const deleteSubscriptionAction = async (id) => {
+    const res = await subscriptionApi.deleteSubscription(id);
+    await refreshAll();
+    return res;
+  };
+
+  const createPlanAction = async (planData) => {
+    const res = await subscriptionApi.createPlan(planData);
+    await refreshAll();
+    return res;
+  };
+
+  const updatePlanAction = async (id, planData) => {
+    const res = await subscriptionApi.updatePlan(id, planData);
+    await refreshAll();
+    return res;
+  };
+
+  const deletePlanAction = async (id) => {
+    const res = await subscriptionApi.deletePlan(id);
+    await refreshAll();
+    return res;
+  };
+
+  const saveSettingsAction = async (settingsData) => {
+    const { platformSettingsApi } = await import('../api/platformSettingsApi');
+    const updated = await platformSettingsApi.updateSettings(settingsData);
+    if (updated) {
+      setGeneralSettings(prev => ({
+        ...prev,
+        platformName: updated.platformName || prev.platformName,
+        platformEmail: updated.platformEmail || prev.platformEmail,
+        supportPhone: updated.supportPhone || prev.supportPhone,
+        defaultCurrency: updated.defaultCurrency || prev.defaultCurrency,
+        defaultTimezone: updated.defaultTimezone || prev.defaultTimezone,
+        dateFormat: updated.dateFormat || prev.dateFormat,
+        logoUrl: updated.logoUrl || null
+      }));
+    }
+    return updated;
+  };
+
+  const removeLogoAction = async () => {
+    const { platformSettingsApi } = await import('../api/platformSettingsApi');
+    const updated = await platformSettingsApi.removeLogo();
+    setGeneralSettings(prev => ({
+      ...prev,
+      logoUrl: null
+    }));
+    return updated;
+  };
+
   return (
     <SuperAdminContext.Provider
       value={{
@@ -297,6 +398,8 @@ export function SuperAdminProvider({ children }) {
         error,
         refreshSuperAdminData,
         revenueMonthlyData: revenueData,
+        revenueMonthlyData6M: revenueData6M,
+        revenueMonthlyData1Y: revenueData1Y,
         subscriptionDistribution: distributionData,
         generalSettings,
         setGeneralSettings,
@@ -313,9 +416,16 @@ export function SuperAdminProvider({ children }) {
         updateCompanyStatus,
         deleteCompany,
         updateSubscriptionAction,
+        deleteSubscriptionAction,
+        createPlanAction,
+        updatePlanAction,
+        deletePlanAction,
+        saveSettingsAction,
+        removeLogoAction,
         refreshCompanies,
         refreshSubscriptions,
         refreshPlans,
+        refreshSettings,
         refreshDashboard,
         refreshAll,
         loading,

@@ -25,6 +25,7 @@ public class CompanyService {
     private final CustomerRepository customerRepository;
     private final LeadRepository leadRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final ActivityRepository activityRepository;
     private final CompanySettingRepository companySettingRepository;
     private final PasswordEncoder passwordEncoder;
@@ -36,6 +37,7 @@ public class CompanyService {
             CustomerRepository customerRepository,
             LeadRepository leadRepository,
             SubscriptionRepository subscriptionRepository,
+            SubscriptionPlanRepository subscriptionPlanRepository,
             ActivityRepository activityRepository,
             CompanySettingRepository companySettingRepository,
             PasswordEncoder passwordEncoder,
@@ -46,6 +48,7 @@ public class CompanyService {
         this.customerRepository = customerRepository;
         this.leadRepository = leadRepository;
         this.subscriptionRepository = subscriptionRepository;
+        this.subscriptionPlanRepository = subscriptionPlanRepository;
         this.activityRepository = activityRepository;
         this.companySettingRepository = companySettingRepository;
         this.passwordEncoder = passwordEncoder;
@@ -78,6 +81,13 @@ public class CompanyService {
             throw new DuplicateResourceException("Company with email '" + companyEmail + "' already exists.");
         }
 
+        String adminEmail = (request.getAdminEmail() != null && !request.getAdminEmail().isBlank())
+                ? request.getAdminEmail().trim().toLowerCase()
+                : companyEmail;
+        if (userRepository.existsByEmailIgnoreCase(adminEmail)) {
+            throw new DuplicateResourceException("Company Administrator email '" + adminEmail + "' already exists. Please choose a different email.");
+        }
+
         // Generate safe unique company ID (e.g. COMP002, COMP003...)
         long count = companyRepository.count() + 1;
         String companyId = "COMP" + String.format("%03d", count);
@@ -92,11 +102,28 @@ public class CompanyService {
         company.setEmail(companyEmail);
         company.setPhone(request.getPhone() != null ? request.getPhone().trim() : "");
         company.setAddress(request.getAddress());
-        company.setPlan(request.getPlan() != null ? request.getPlan() : "Growth");
+        String planName = request.getPlan() != null ? request.getPlan().trim() : "Growth";
+        company.setPlan(planName);
         company.setBillingCycle(request.getBillingCycle() != null ? request.getBillingCycle() : "Monthly");
-        company.setPrice(request.getPrice() != null ? request.getPrice() : "₹2,499 / mo");
+        
+        // Derive user limit and default price from actual plan in database
+        Optional<SubscriptionPlan> matchedPlan = subscriptionPlanRepository.findAll().stream()
+                .filter(p -> p.getName() != null && p.getName().equalsIgnoreCase(planName))
+                .findFirst();
+
+        if (matchedPlan.isPresent()) {
+            SubscriptionPlan planEntity = matchedPlan.get();
+            company.setUserLimit(request.getUserLimit() != null && request.getUserLimit() > 0 ? request.getUserLimit() : planEntity.getUserLimit());
+            if (request.getPrice() != null && !request.getPrice().isBlank()) {
+                company.setPrice(cleanPrice(request.getPrice()));
+            } else {
+                company.setPrice("₹" + planEntity.getMonthlyPrice().stripTrailingZeros().toPlainString());
+            }
+        } else {
+            company.setUserLimit(request.getUserLimit() != null ? request.getUserLimit() : 20);
+            company.setPrice(cleanPrice(request.getPrice()));
+        }
         company.setStatus(request.getStatus() != null ? request.getStatus() : "Active");
-        company.setUserLimit(request.getUserLimit() != null ? request.getUserLimit() : 20);
 
         String domainClean = request.getName().toLowerCase().replaceAll("[^a-z0-9]", "");
         if (domainClean.isBlank()) {
@@ -134,9 +161,6 @@ public class CompanyService {
         subscriptionRepository.save(sub);
 
         // Create Company Administrator and link to this company
-        String adminEmail = (request.getAdminEmail() != null && !request.getAdminEmail().isBlank())
-                ? request.getAdminEmail().trim().toLowerCase()
-                : companyEmail;
         String adminName = (request.getAdminName() != null && !request.getAdminName().isBlank())
                 ? request.getAdminName().trim()
                 : request.getName() + " Admin";
@@ -144,7 +168,7 @@ public class CompanyService {
                 ? request.getAdminUserId().trim()
                 : "adm_" + domainClean;
 
-        // If email or userId already taken, adjust userId to be unique
+        // If userId already taken, adjust userId to be unique
         int suffix = 1;
         String candidateUserId = adminUserId;
         while (userRepository.existsByUserIdIgnoreCase(candidateUserId)) {
@@ -152,16 +176,15 @@ public class CompanyService {
         }
         adminUserId = candidateUserId;
 
-        if (userRepository.existsByEmailIgnoreCase(adminEmail)) {
-            throw new DuplicateResourceException("User with email '" + adminEmail + "' already exists.");
-        }
-
         User adminUser = new User();
         adminUser.setUserId(adminUserId);
         adminUser.setFullName(adminName);
         adminUser.setEmail(adminEmail);
-        String pwd = request.getAdminPassword() != null ? request.getAdminPassword() : "Password123";
-        adminUser.setPasswordHash(passwordEncoder.encode(pwd));
+        String rawPassword = request.getAdminPassword();
+        if (rawPassword == null || rawPassword.trim().isEmpty()) {
+            throw new com.nexora.crm.exception.BusinessRuleException("Administrator Password is required.");
+        }
+        adminUser.setPasswordHash(passwordEncoder.encode(rawPassword.trim()));
         adminUser.setRole(RoleType.COMPANY_ADMIN);
         adminUser.setCompany(savedCompany);
         adminUser.setDepartment("Executive Leadership");
@@ -182,11 +205,36 @@ public class CompanyService {
         if (request.getEmail() != null) company.setEmail(request.getEmail().trim());
         if (request.getPhone() != null) company.setPhone(request.getPhone().trim());
         if (request.getAddress() != null) company.setAddress(request.getAddress());
-        if (request.getPlan() != null) company.setPlan(request.getPlan());
+        if (request.getPlan() != null && !request.getPlan().isBlank()) {
+            String newPlan = request.getPlan().trim();
+            company.setPlan(newPlan);
+            if (request.getUserLimit() == null) {
+                subscriptionPlanRepository.findAll().stream()
+                        .filter(p -> p.getName() != null && p.getName().equalsIgnoreCase(newPlan))
+                        .findFirst()
+                        .ifPresent(p -> company.setUserLimit(p.getUserLimit()));
+            }
+        }
         if (request.getBillingCycle() != null) company.setBillingCycle(request.getBillingCycle());
-        if (request.getPrice() != null) company.setPrice(request.getPrice());
-        if (request.getUserLimit() != null) company.setUserLimit(request.getUserLimit());
-        if (request.getStatus() != null) company.setStatus(request.getStatus());
+        if (request.getPrice() != null) company.setPrice(cleanPrice(request.getPrice()));
+        if (request.getUserLimit() != null && request.getUserLimit() > 0) company.setUserLimit(request.getUserLimit());
+        if (request.getStatus() != null) {
+            String status = request.getStatus().trim();
+            company.setStatus(status);
+            if ("Suspended".equalsIgnoreCase(status) || "Inactive".equalsIgnoreCase(status) || "Cancelled".equalsIgnoreCase(status)) {
+                company.setIsActive(false);
+                subscriptionRepository.findTopByCompany_IdOrderByCreatedAtDesc(company.getId()).ifPresent(sub -> {
+                    sub.setStatus("Suspended");
+                    subscriptionRepository.save(sub);
+                });
+            } else if ("Active".equalsIgnoreCase(status)) {
+                company.setIsActive(true);
+                subscriptionRepository.findTopByCompany_IdOrderByCreatedAtDesc(company.getId()).ifPresent(sub -> {
+                    sub.setStatus("Active");
+                    subscriptionRepository.save(sub);
+                });
+            }
+        }
 
         Company updated = companyRepository.save(company);
         return mapToResponse(updated);
@@ -199,6 +247,20 @@ public class CompanyService {
         company.setIsActive(false);
         company.setStatus("Suspended");
         companyRepository.save(company);
+
+        subscriptionRepository.findTopByCompany_IdOrderByCreatedAtDesc(company.getId()).ifPresent(sub -> {
+            sub.setStatus("Suspended");
+            subscriptionRepository.save(sub);
+        });
+    }
+
+    public static String cleanPrice(String price) {
+        if (price == null || price.isBlank()) return "₹2,499";
+        String cleaned = price.replaceAll("\\s*/\\s*(mo|month|monthly|yr|year|annually|quarterly).*$", "").trim();
+        if (!cleaned.startsWith("₹") && !cleaned.startsWith("INR") && !cleaned.startsWith("$")) {
+            return "₹" + cleaned;
+        }
+        return cleaned;
     }
 
     private CompanyResponse mapToResponse(Company company) {
@@ -214,7 +276,7 @@ public class CompanyService {
         res.setLogoColor(company.getLogoColor());
         res.setPlan(company.getPlan());
         res.setBillingCycle(company.getBillingCycle());
-        res.setPrice(company.getPrice());
+        res.setPrice(cleanPrice(company.getPrice()));
         res.setStatus(company.getStatus());
         res.setUserLimit(company.getUserLimit());
         res.setRenewalDate(company.getRenewalDate());
