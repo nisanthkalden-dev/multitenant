@@ -5436,6 +5436,40 @@ select.form-input option,
   border-radius: var(--radius-full);
 }
 
+.sa-controls-row {
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+.sa-settings-plan-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: 38px;
+  background-color: var(--bg-slate);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.sa-settings-plan-link:hover {
+  background-color: var(--bg-card);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
 .sa-plans-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -6523,7 +6557,14 @@ select.form-input option,
     grid-template-columns: 1fr;
     gap: 16px;
   }
+  .sa-controls-row {
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 10px;
+  }
   .sa-billing-toggle-wrap {
+    flex: 1;
+    min-width: 240px;
     width: 100%;
   }
   .sa-billing-toggle-btn {
@@ -7770,4 +7811,97 @@ select.form-input option,
   .crm-data-table td {
     padding: 10px 12px;
   }
+}
+
+/* --------------------------------------------------------------------------
+   Plan Management / Subscription Settings Page Polish
+   -------------------------------------------------------------------------- */
+.sa-pm-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sa-pm-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sa-pm-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sa-pm-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: color 0.15s ease;
+  margin-bottom: 4px;
+}
+
+.sa-pm-back-btn:hover {
+  color: var(--tertiary);
+}
+
+.sa-pm-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.sa-pm-page-subtitle {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.sa-pm-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.sa-pm-card-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: rgba(255, 255, 255, 0.015);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sa-pm-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.sa-pm-card-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.sa-pm-table th {
+  padding: 16px 22px;
+}
+
+.sa-pm-table td {
+  padding: 18px 22px;
 }
