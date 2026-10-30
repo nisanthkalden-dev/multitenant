@@ -503,7 +503,7 @@ export default function SubscriptionsPage() {
           <div>
             <h3 className="sa-card-title">Live Subscriptions</h3>
             <p className="sa-card-subtitle">
-              Active and historical subscriber billing records in MySQL ({filteredSubscriptions.length})
+              Active and historical subscriber billing records  ({filteredSubscriptions.length})
             </p>
           </div>
 
@@ -615,7 +615,7 @@ export default function SubscriptionsPage() {
                       </td>
                       <td>
                         {sub.companyStatus ? (
-                           <StatusBadge status={sub.companyStatus} />
+                          <StatusBadge status={sub.companyStatus} />
                         ) : (
                           <span className="text-muted font-mono text-xs">—</span>
                         )}
