@@ -183,7 +183,7 @@ export default function PlanManagementPage() {
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            <span>+ Add Plan</span>
+            <span>&nbsp;Add Plan</span>
           </button>
         </div>
 
@@ -350,9 +350,7 @@ export default function PlanManagementPage() {
                       onChange={(e) => setPlanFormData({ ...planFormData, monthlyPrice: e.target.value })}
                     />
                   </div>
-                  <span className="text-muted font-mono text-xs mt-1 block">
-                    Actual MySQL database price. Change from ₹999 to ₹299 to update globally.
-                  </span>
+
                 </div>
 
                 <div className="form-group mb-3">
@@ -379,9 +377,7 @@ export default function PlanManagementPage() {
                     value={planFormData.userLimit}
                     onChange={(e) => setPlanFormData({ ...planFormData, userLimit: e.target.value })}
                   />
-                  <span className="text-muted font-mono text-xs mt-1 block">
-                    Enforced by backend when company users/seats are added.
-                  </span>
+
                 </div>
 
                 <div className="form-group mb-3">
@@ -433,7 +429,7 @@ export default function PlanManagementPage() {
                   className="btn btn-primary btn-sm font-mono"
                   disabled={planSaving}
                 >
-                  {planSaving ? 'Saving to Database...' : (planModalMode === 'create' ? 'Create Plan in MySQL' : 'Save Plan Changes')}
+                  {planSaving ? 'Saving...' : (planModalMode === 'create' ? 'Create Plan' : 'Save Plan Changes')}
                 </button>
               </div>
             </form>
