@@ -11,6 +11,7 @@ export default function SuperAdminSettings() {
     setGeneralSettings,
     profileSettings,
     setProfileSettings,
+    saveProfileSettings,
     securitySettings,
     setSecuritySettings,
     notificationSettings,
@@ -207,6 +208,15 @@ export default function SuperAdminSettings() {
       showSaveError(err.message || 'Failed to remove brand logo');
     } finally {
       setIsRemovingLogo(false);
+    try {
+      if (saveProfileSettings) {
+        await saveProfileSettings(profileForm);
+      } else {
+        setProfileSettings(profileForm);
+      }
+      showSaveSuccess('Profile');
+    } catch (err) {
+      alert(err.message || 'Failed to save profile');
     }
   };
 
@@ -241,6 +251,15 @@ export default function SuperAdminSettings() {
       setPasswordError('New password cannot be the same as the current password.');
       return;
     }
+    try {
+      await userApi.changePassword({
+        currentPassword: securityPassword.currentPassword,
+        newPassword: securityPassword.newPassword
+      });
+      setSecurityPassword({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      showSaveSuccess('Security password');
+    } catch (err) {
+      alert(err.message || 'Failed to update password');
 
     setPasswordSubmitting(true);
     try {

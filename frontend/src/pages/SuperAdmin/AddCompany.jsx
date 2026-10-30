@@ -30,6 +30,8 @@ export default function AddCompany() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackSuccess, setFeedbackSuccess] = useState(false);
 
+  const [apiError, setApiError] = useState('');
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === 'plan') {
@@ -47,6 +49,7 @@ export default function AddCompany() {
         setErrors((prev) => ({ ...prev, confirmPassword: null }));
       }
     }
+    if (apiError) setApiError('');
     if (serverError) {
       setServerError(null);
     }
@@ -97,8 +100,16 @@ export default function AddCompany() {
     if (!validate()) return;
 
     setIsSubmitting(true);
+    setApiError('');
 
     try {
+      const created = await addCompany({
+        ...formData,
+        adminName: formData.adminName || `${formData.name} Admin`,
+        adminEmail: formData.adminEmail || formData.email
+      });
+      setIsSubmitting(false);
+      setFeedbackSuccess(true);
       const planPrices = {
         Starter: '₹999',
         Growth: '₹2,499',
@@ -123,6 +134,11 @@ export default function AddCompany() {
       const created = await addCompany(payload);
       setFeedbackSuccess(true);
       setTimeout(() => {
+        navigate(`/super-admin/companies/${created.id}`);
+      }, 700);
+    } catch (err) {
+      setIsSubmitting(false);
+      setApiError(err.message || 'Failed to create company. Please check your data.');
         navigate(`/super-admin/companies/${created.id || ''}`);
       }, 900);
     } catch (err) {
@@ -156,6 +172,11 @@ export default function AddCompany() {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
+            <span>Company provisioned successfully! Redirecting to company overview...</span>
+          </div>
+        )}
+
+        {apiError && (
             <span>Company saved successfully in MySQL! Redirecting...</span>
           </div>
         )}
@@ -167,6 +188,7 @@ export default function AddCompany() {
               <line x1="12" y1="8" x2="12" y2="12"></line>
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
             </svg>
+            <span>{apiError}</span>
             <span>{serverError}</span>
           </div>
         )}
