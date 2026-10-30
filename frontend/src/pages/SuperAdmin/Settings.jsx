@@ -16,16 +16,34 @@ export default function SuperAdminSettings() {
     setSecuritySettings,
     notificationSettings,
     setNotificationSettings,
-    platformPreferences,
-    setPlatformPreferences
+    saveSettingsAction,
+    removeLogoAction,
+    refreshAll
   } = useSuperAdmin();
 
   const [activeTab, setActiveTab] = useState('general');
   const [saveFeedback, setSaveFeedback] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [isSavingGeneral, setIsSavingGeneral] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isRemovingAvatar, setIsRemovingAvatar] = useState(false);
+  const [isRemovingLogo, setIsRemovingLogo] = useState(false);
+  const [showConfirmRemoveAvatar, setShowConfirmRemoveAvatar] = useState(false);
+  const [showConfirmRemoveLogo, setShowConfirmRemoveLogo] = useState(false);
 
   // Local form states
   const [generalForm, setGeneralForm] = useState({ ...generalSettings });
   const [profileForm, setProfileForm] = useState({ ...profileSettings });
+
+  // Sync when context settings load
+  React.useEffect(() => {
+    setGeneralForm({ ...generalSettings });
+  }, [generalSettings]);
+
+  React.useEffect(() => {
+    setProfileForm({ ...profileSettings });
+  }, [profileSettings]);
+
   const [securityPassword, setSecurityPassword] = useState({
     currentPassword: '',
     newPassword: '',
@@ -65,19 +83,131 @@ export default function SuperAdminSettings() {
     }
   };
 
-  const showSaveSuccess = (section) => {
-    setSaveFeedback(`${section} settings updated successfully in local state!`);
-    setTimeout(() => setSaveFeedback(''), 3000);
+  const showSaveSuccess = (msg) => {
+    setSaveFeedback(msg);
+    setSaveError('');
+    setTimeout(() => setSaveFeedback(''), 4000);
   };
 
-  const handleGeneralSave = (e) => {
+  const showSaveError = (msg) => {
+    setSaveError(msg);
+    setSaveFeedback('');
+    setTimeout(() => setSaveError(''), 5000);
+  };
+
+  const handleGeneralSave = async (e) => {
     e.preventDefault();
-    setGeneralSettings(generalForm);
-    showSaveSuccess('General');
+    setIsSavingGeneral(true);
+    setSaveError('');
+    try {
+      if (saveSettingsAction) {
+        await saveSettingsAction(generalForm);
+      } else {
+        setGeneralSettings(generalForm);
+      }
+      showSaveSuccess('General platform settings saved successfully to MySQL database!');
+    } catch (err) {
+      showSaveError(err.message || 'Failed to save settings to database');
+    } finally {
+      setIsSavingGeneral(false);
+    }
   };
 
   const handleProfileSave = async (e) => {
     e.preventDefault();
+    setIsSavingProfile(true);
+    setSaveError('');
+    try {
+      const payload = {
+        name: profileForm.fullName,
+        fullName: profileForm.fullName,
+        email: profileForm.email,
+        phone: profileForm.phone,
+        avatar: profileForm.avatarUrl
+      };
+      await userApi.updateProfile(payload);
+      setProfileSettings(profileForm);
+
+      // Update session storage so avatar persists across refreshes and logout/login
+      try {
+        const rawSession = localStorage.getItem('nexora_auth_session');
+        if (rawSession) {
+          const session = JSON.parse(rawSession);
+          if (session.user) {
+            session.user.name = profileForm.fullName;
+            session.user.fullName = profileForm.fullName;
+            session.user.email = profileForm.email;
+            session.user.phone = profileForm.phone;
+            session.user.avatar = profileForm.avatarUrl || 'SA';
+          }
+          localStorage.setItem('nexora_auth_session', JSON.stringify(session));
+        }
+      } catch (ignored) {}
+
+      if (refreshAll) {
+        await refreshAll();
+      }
+      showSaveSuccess('Super Admin profile and photo updated and saved in MySQL database!');
+    } catch (err) {
+      showSaveError(err.message || 'Failed to update profile in database');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleConfirmRemoveAvatar = async () => {
+    setIsRemovingAvatar(true);
+    setSaveError('');
+    try {
+      const updatedUser = await userApi.removeAvatar();
+      setProfileForm((prev) => ({ ...prev, avatarUrl: null }));
+      setProfileSettings((prev) => ({ ...prev, avatarUrl: null }));
+      if (profileFileInputRef.current) profileFileInputRef.current.value = '';
+
+      // Clear avatar from localStorage session
+      try {
+        const rawSession = localStorage.getItem('nexora_auth_session');
+        if (rawSession) {
+          const session = JSON.parse(rawSession);
+          if (session.user) {
+            session.user.avatar = null;
+          }
+          localStorage.setItem('nexora_auth_session', JSON.stringify(session));
+        }
+      } catch (ignored) {}
+
+      if (refreshAll) {
+        await refreshAll();
+      }
+      setShowConfirmRemoveAvatar(false);
+      showSaveSuccess('Profile picture removed successfully from MySQL database!');
+    } catch (err) {
+      showSaveError(err.message || 'Failed to remove profile picture');
+    } finally {
+      setIsRemovingAvatar(false);
+    }
+  };
+
+  const handleConfirmRemoveLogo = async () => {
+    setIsRemovingLogo(true);
+    setSaveError('');
+    try {
+      if (removeLogoAction) {
+        await removeLogoAction();
+      }
+      setGeneralForm((prev) => ({ ...prev, logoUrl: null }));
+      setGeneralSettings((prev) => ({ ...prev, logoUrl: null }));
+      if (generalFileInputRef.current) generalFileInputRef.current.value = '';
+
+      if (refreshAll) {
+        await refreshAll();
+      }
+      setShowConfirmRemoveLogo(false);
+      showSaveSuccess('Platform brand logo removed successfully from MySQL database!');
+    } catch (err) {
+      showSaveError(err.message || 'Failed to remove brand logo');
+    } finally {
+      setIsRemovingLogo(false);
     try {
       if (saveProfileSettings) {
         await saveProfileSettings(profileForm);
@@ -229,6 +359,16 @@ export default function SuperAdminSettings() {
           <span>{saveFeedback}</span>
         </div>
       )}
+      {saveError && (
+        <div className="auth-alert alert-error font-mono mb-4" role="alert">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>{saveError}</span>
+        </div>
+      )}
 
       {/* 1. General Settings Panel */}
       {activeTab === 'general' && (
@@ -276,12 +416,10 @@ export default function SuperAdminSettings() {
                       <button
                         type="button"
                         className="btn btn-danger btn-xs font-mono"
-                        onClick={() => {
-                          setGeneralForm((prev) => ({ ...prev, logoUrl: null }));
-                          if (generalFileInputRef.current) generalFileInputRef.current.value = '';
-                        }}
+                        onClick={() => setShowConfirmRemoveLogo(true)}
+                        disabled={isRemovingLogo}
                       >
-                        Remove Image
+                        {isRemovingLogo ? 'Removing...' : 'Remove Image'}
                       </button>
                     )}
                   </div>
@@ -369,8 +507,12 @@ export default function SuperAdminSettings() {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary font-mono">
-                  Save Changes
+                <button
+                  type="submit"
+                  className="btn btn-primary font-mono"
+                  disabled={isSavingGeneral}
+                >
+                  {isSavingGeneral ? 'Saving to Database...' : 'Save General Settings'}
                 </button>
               </div>
             </form>
@@ -433,12 +575,10 @@ export default function SuperAdminSettings() {
                       <button
                         type="button"
                         className="btn btn-danger btn-xs font-mono"
-                        onClick={() => {
-                          setProfileForm((prev) => ({ ...prev, avatarUrl: null }));
-                          if (profileFileInputRef.current) profileFileInputRef.current.value = '';
-                        }}
+                        onClick={() => setShowConfirmRemoveAvatar(true)}
+                        disabled={isRemovingAvatar}
                       >
-                        Remove Photo
+                        {isRemovingAvatar ? 'Removing...' : 'Remove Photo'}
                       </button>
                     )}
                   </div>
@@ -489,8 +629,12 @@ export default function SuperAdminSettings() {
               </div>
 
               <div className="sa-form-footer mt-6">
-                <button type="submit" className="btn btn-primary font-mono">
-                  Save Changes
+                <button
+                  type="submit"
+                  className="btn btn-primary font-mono"
+                  disabled={isSavingProfile}
+                >
+                  {isSavingProfile ? 'Saving to Database...' : 'Save Profile Changes'}
                 </button>
               </div>
             </form>
@@ -933,7 +1077,99 @@ export default function SuperAdminSettings() {
             </div>
           </div>
         </div>
-      )} */}
+      {/* Confirmation Modal for Profile Avatar Removal */}
+      {showConfirmRemoveAvatar && (
+        <div className="sa-modal-backdrop" onClick={() => !isRemovingAvatar && setShowConfirmRemoveAvatar(false)}>
+          <div className="sa-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="sa-modal-header">
+              <h3 className="font-semibold text-lg text-danger flex items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Remove Profile Picture
+              </h3>
+              <button
+                type="button"
+                className="sa-modal-close"
+                onClick={() => !isRemovingAvatar && setShowConfirmRemoveAvatar(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="sa-modal-body py-4">
+              <p className="text-sm text-secondary">
+                Are you sure you want to remove your profile picture? Your profile will revert to the default placeholder.
+              </p>
+            </div>
+            <div className="sa-modal-footer flex justify-end gap-3 pt-3 border-t">
+              <button
+                type="button"
+                className="btn btn-secondary font-mono text-sm"
+                onClick={() => setShowConfirmRemoveAvatar(false)}
+                disabled={isRemovingAvatar}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger font-mono text-sm flex items-center gap-2"
+                onClick={handleConfirmRemoveAvatar}
+                disabled={isRemovingAvatar}
+              >
+                {isRemovingAvatar ? 'Removing...' : 'Yes, Remove Picture'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Brand Logo Removal */}
+      {showConfirmRemoveLogo && (
+        <div className="sa-modal-backdrop" onClick={() => !isRemovingLogo && setShowConfirmRemoveLogo(false)}>
+          <div className="sa-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="sa-modal-header">
+              <h3 className="font-semibold text-lg text-danger flex items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Remove Platform Brand Logo
+              </h3>
+              <button
+                type="button"
+                className="sa-modal-close"
+                onClick={() => !isRemovingLogo && setShowConfirmRemoveLogo(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="sa-modal-body py-4">
+              <p className="text-sm text-secondary">
+                Are you sure you want to remove the platform brand logo? The platform will revert to the default monogram display.
+              </p>
+            </div>
+            <div className="sa-modal-footer flex justify-end gap-3 pt-3 border-t">
+              <button
+                type="button"
+                className="btn btn-secondary font-mono text-sm"
+                onClick={() => setShowConfirmRemoveLogo(false)}
+                disabled={isRemovingLogo}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger font-mono text-sm flex items-center gap-2"
+                onClick={handleConfirmRemoveLogo}
+                disabled={isRemovingLogo}
+              >
+                {isRemovingLogo ? 'Removing...' : 'Yes, Remove Logo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

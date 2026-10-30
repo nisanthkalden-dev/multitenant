@@ -96,6 +96,7 @@ public class AuthService {
         // Generate Access and Refresh tokens
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
+        UserSummaryDto userSummary = mapToSummary(user);
 
         return new AuthTokenResponse(accessToken, refreshToken, "Bearer");
     }
@@ -124,11 +125,20 @@ public class AuthService {
             throw new BadCredentialsException("Account is deactivated. Please contact support.");
         }
 
+        // Verify company active status for company users
+        boolean isSuperAdmin = user.getRole() == RoleType.SUPER_ADMIN;
+        if (!isSuperAdmin) {
+            Company company = user.getCompany();
+            if (company == null || !Boolean.TRUE.equals(company.getIsActive()) || "Suspended".equalsIgnoreCase(company.getStatus())) {
+                log.warn("Login rejected for user '{}': Company '{}' is suspended or inactive", user.getEmail(), company != null ? company.getId() : "null");
+                throw new BadCredentialsException("Your company account is suspended. Please contact the administrator.");
+            }
+        }
+
         // Verify BCrypt password
         verifyPassword(request.getPassword(), user.getPasswordHash());
 
         // Check loginType if specified
-        boolean isSuperAdmin = user.getRole() == RoleType.SUPER_ADMIN;
         if ("super_admin".equalsIgnoreCase(request.getLoginType()) && !isSuperAdmin) {
             throw new BusinessRuleException("This account does not have Super Admin platform privileges. Please use Company login.");
         }
@@ -197,6 +207,15 @@ public class AuthService {
             throw new BadCredentialsException("Account is deactivated. Please contact support.");
         }
 
+        // Verify company active status for company users
+        if (user.getRole() != RoleType.SUPER_ADMIN) {
+            Company company = user.getCompany();
+            if (company == null || !Boolean.TRUE.equals(company.getIsActive()) || "Suspended".equalsIgnoreCase(company.getStatus())) {
+                log.warn("Refresh token rejected for user '{}': Company '{}' is suspended or inactive", user.getEmail(), company != null ? company.getId() : "null");
+                throw new BadCredentialsException("Your company account is suspended. Please contact the administrator.");
+            }
+        }
+
         // 4. Generate new Access Token and new Refresh Token statelessly
         String newAccessToken = jwtService.generateAccessToken(user);
         String newRefreshToken = jwtService.generateRefreshToken(user);
@@ -262,6 +281,12 @@ public class AuthService {
             return companyRepository.save(newComp);
         });
 
+        // Enforce plan user limit quota
+        long currentCount = userRepository.countByCompany_Id(company.getId());
+        if (company.getUserLimit() != null && currentCount >= company.getUserLimit()) {
+            throw new BusinessRuleException("User limit reached for current plan (" + company.getUserLimit() + " users). Upgrade subscription to add more seats.");
+        }
+
         user.setCompany(company);
         user.setRole(RoleType.COMPANY_ADMIN);
         user.setStatus("Active");
@@ -306,7 +331,7 @@ public class AuthService {
         dto.setCompanyId(user.getCompany() != null ? user.getCompany().getId() : null);
         dto.setCompanyName(user.getCompany() != null ? user.getCompany().getName() : (user.getRole() == RoleType.SUPER_ADMIN ? "Nexora Platform" : null));
         dto.setWorkspace(user.getCompany() != null ? user.getCompany().getWorkspace() : "nexora.app");
-        dto.setAvatar(user.getAvatar() != null ? user.getAvatar() : "US");
+        dto.setAvatar(user.getAvatar());
         dto.setDepartment(user.getDepartment());
         dto.setPhone(user.getPhone());
         dto.setStatus(user.getStatus());

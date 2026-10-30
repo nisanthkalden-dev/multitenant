@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSuperAdmin } from '../../context/SuperAdminContext';
 import AdminLayout from '../../components/SuperAdmin/AdminLayout';
@@ -10,14 +10,63 @@ export default function SuperAdminDashboard() {
     stats,
     companies,
     revenueMonthlyData,
+    revenueMonthlyData6M,
+    revenueMonthlyData1Y,
     subscriptionDistribution,
-    activities
+    activities,
+    refreshDashboard
   } = useSuperAdmin();
 
   const [revenuePeriod, setRevenuePeriod] = useState('6M');
 
+  const handlePeriodChange = (period) => {
+    setRevenuePeriod(period);
+    if (refreshDashboard) {
+      refreshDashboard(period);
+    }
+  };
+
+  // Select active revenue dataset based on chosen period (6M or 1Y)
+  const activeRevenueData = useMemo(() => {
+    if (revenuePeriod === '1Y') {
+      return revenueMonthlyData1Y && revenueMonthlyData1Y.length > 0
+        ? revenueMonthlyData1Y
+        : revenueMonthlyData;
+    }
+    return revenueMonthlyData6M && revenueMonthlyData6M.length > 0
+      ? revenueMonthlyData6M
+      : revenueMonthlyData;
+  }, [revenuePeriod, revenueMonthlyData, revenueMonthlyData6M, revenueMonthlyData1Y]);
+
   // Preview the first 5 recent companies
   const recentCompanies = companies.slice(0, 5);
+
+  // Dynamic SVG Chart calculation for actual database-derived revenue
+  const chartHeight = 160;
+  const chartWidth = 500;
+
+  const maxRevenue = useMemo(() => {
+    if (!activeRevenueData || activeRevenueData.length === 0) return 10000;
+    const maxVal = Math.max(...activeRevenueData.map((d) => Number(d.revenue) || 0));
+    return maxVal > 0 ? Math.ceil(maxVal * 1.25) : 10000;
+  }, [activeRevenueData]);
+
+
+  const points = useMemo(() => {
+    if (!activeRevenueData || activeRevenueData.length === 0) return [];
+    const count = activeRevenueData.length;
+    return activeRevenueData.map((d, index) => {
+      const x = count > 1
+        ? (index / (count - 1)) * (chartWidth - 60) + 30
+        : chartWidth / 2;
+      const y = chartHeight - ((Number(d.revenue) || 0) / maxRevenue) * (chartHeight - 30) - 15;
+      return { x, y, ...d };
+    });
+  }, [activeRevenueData, maxRevenue]);
+
+  const pathD = points.length > 0
+    ? points.reduce((acc, pt, idx) => (idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`), '')
+    : `M 30 ${chartHeight - 15} L ${chartWidth - 30} ${chartHeight - 15}`;
 
   // SVG Chart calculation for revenue
   const maxRevenue = 900000;
@@ -124,14 +173,14 @@ export default function SuperAdminDashboard() {
               <button
                 type="button"
                 className={`sa-pill-btn ${revenuePeriod === '6M' ? 'active' : ''}`}
-                onClick={() => setRevenuePeriod('6M')}
+                onClick={() => handlePeriodChange('6M')}
               >
                 6 Months
               </button>
               <button
                 type="button"
                 className={`sa-pill-btn ${revenuePeriod === '1Y' ? 'active' : ''}`}
-                onClick={() => setRevenuePeriod('1Y')}
+                onClick={() => handlePeriodChange('1Y')}
               >
                 1 Year
               </button>
@@ -141,7 +190,9 @@ export default function SuperAdminDashboard() {
           <div className="sa-card-body">
             <div className="sa-chart-header-metric font-mono">
               <span className="sa-current-mrr">{stats.monthlyRevenue.value}</span>
-              <span className="sa-mrr-delta">+14.8% vs last month</span>
+              <span className={`sa-mrr-delta ${stats.monthlyRevenue.trend === 'up' ? 'text-success' : (stats.monthlyRevenue.trend === 'down' ? 'text-danger' : '')}`}>
+                {stats.monthlyRevenue.growth} vs last month
+              </span>
             </div>
 
             <div className="sa-chart-svg-container">
@@ -212,7 +263,9 @@ export default function SuperAdminDashboard() {
           <div className="sa-card-header">
             <div>
               <h2 className="sa-card-title">Subscription Distribution</h2>
-              <p className="sa-card-subtitle">Active tier allocations across 248 accounts</p>
+              <p className="sa-card-subtitle">
+                Active tier allocations across {companies.length} {companies.length === 1 ? 'account' : 'accounts'}
+              </p>
             </div>
           </div>
 
@@ -249,7 +302,7 @@ export default function SuperAdminDashboard() {
             </div>
 
             <div className="sa-distribution-footer-box">
-              <span className="font-mono text-tertiary">★ Growth Tier</span> is the fastest-growing tier with +18 new accounts this month.
+              <span className="font-mono text-tertiary">★ Plan Diversity</span> Active subscriptions distributed across {subscriptionDistribution.filter(t => t.count > 0).length} tier{subscriptionDistribution.filter(t => t.count > 0).length === 1 ? '' : 's'}.
             </div>
           </div>
         </div>
@@ -257,135 +310,135 @@ export default function SuperAdminDashboard() {
 
       {/* Recent Companies & Live Activity Dual Grid */}
       {/* <div className="sa-tables-grid"> */}
-        {/* Recent Companies Card */}
-        <div className="sa-card sa-recent-companies-card">
-          <div className="sa-card-header">
-            <div>
-              <h2 className="sa-card-title">Recent Company Registrations</h2>
-              <p className="sa-card-subtitle">Latest organizations joined the platform</p>
-            </div>
-            <Link to="/super-admin/companies" className="btn btn-secondary btn-sm font-mono">
-              View All ({companies.length})
-            </Link>
+      {/* Recent Companies Card */}
+      <div className="sa-card sa-recent-companies-card">
+        <div className="sa-card-header">
+          <div>
+            <h2 className="sa-card-title">Recent Company Registrations</h2>
+            <p className="sa-card-subtitle">Latest organizations joined the platform</p>
           </div>
-
-          <div className="sa-card-body p-0">
-            {/* Desktop / Laptop Table */}
-            <div className="sa-table-responsive sa-desktop-only-table">
-              <table className="sa-table">
-                <thead>
-                  <tr>
-                    <th>Company</th>
-                    <th>Owner</th>
-                    <th>Plan</th>
-                    <th>Users</th>
-                    <th>Status</th>
-                    <th>Joined</th>
-                    <th className="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentCompanies.map((comp) => (
-                    <tr key={comp.id}>
-                      <td>
-                        <div className="sa-company-cell">
-                          <div
-                            className="sa-company-logo font-mono"
-                            style={{ backgroundColor: `${comp.logoColor}20`, color: comp.logoColor }}
-                          >
-                            {comp.logo}
-                          </div>
-                          <div>
-                            <div className="sa-company-name font-semibold">{comp.name}</div>
-                            <div className="sa-company-sub font-mono">{comp.domain}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="sa-owner-name">{comp.owner?.name || 'Admin'}</div>
-                        <div className="sa-owner-email font-mono">{comp.owner?.email || comp.email}</div>
-                      </td>
-                      <td>
-                        <span className="sa-plan-pill font-mono">{comp.plan}</span>
-                      </td>
-                      <td>
-                        <span className="font-mono">{comp.usersCount} users</span>
-                      </td>
-                      <td>
-                        <StatusBadge status={comp.status} />
-                      </td>
-                      <td>
-                        <span className="sa-date-cell font-mono">{comp.joinedDate}</span>
-                      </td>
-                      <td className="text-right">
-                        <Link
-                          to={`/super-admin/companies/${comp.id}`}
-                          className="btn btn-secondary btn-xs font-mono"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile / Compact Tablet Card Representation */}
-            <div className="sa-mobile-only-cards">
-              {recentCompanies.map((comp) => (
-                <div key={comp.id} className="sa-mobile-entity-card">
-                  <div className="sa-mobile-card-top">
-                    <div className="sa-company-cell">
-                      <div
-                        className="sa-company-logo font-mono"
-                        style={{ backgroundColor: `${comp.logoColor}20`, color: comp.logoColor }}
-                      >
-                        {comp.logo}
-                      </div>
-                      <div>
-                        <div className="sa-company-name font-semibold">{comp.name}</div>
-                        <div className="sa-company-sub font-mono">{comp.domain}</div>
-                      </div>
-                    </div>
-                    <StatusBadge status={comp.status} />
-                  </div>
-
-                  <div className="sa-mobile-card-details font-mono">
-                    <div className="sa-mobile-meta-row">
-                      <span className="sa-meta-lbl">Admin:</span>
-                      <span className="sa-meta-val">{comp.owner?.name || 'Admin'}</span>
-                    </div>
-                    <div className="sa-mobile-meta-row">
-                      <span className="sa-meta-lbl">Plan:</span>
-                      <span className="sa-plan-pill">{comp.plan}</span>
-                    </div>
-                    <div className="sa-mobile-meta-row">
-                      <span className="sa-meta-lbl">Users:</span>
-                      <span className="sa-meta-val">{comp.usersCount} users</span>
-                    </div>
-                    <div className="sa-mobile-meta-row">
-                      <span className="sa-meta-lbl">Joined:</span>
-                      <span className="sa-meta-val sa-date-cell">{comp.joinedDate}</span>
-                    </div>
-                  </div>
-
-                  <div className="sa-mobile-card-footer">
-                    <Link
-                      to={`/super-admin/companies/${comp.id}`}
-                      className="btn btn-secondary btn-xs font-mono btn-full text-center"
-                    >
-                      View Dossier &rarr;
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Link to="/super-admin/companies" className="btn btn-secondary btn-sm font-mono">
+            View All ({companies.length})
+          </Link>
         </div>
 
-        {/* Live System Activity Feed */}
-        {/* <div className="sa-card sa-activity-card">
+        <div className="sa-card-body p-0">
+          {/* Desktop / Laptop Table */}
+          <div className="sa-table-responsive sa-desktop-only-table">
+            <table className="sa-table">
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th>Owner</th>
+                  <th>Plan</th>
+                  <th>Users</th>
+                  <th>Status</th>
+                  <th>Joined</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentCompanies.map((comp) => (
+                  <tr key={comp.id}>
+                    <td>
+                      <div className="sa-company-cell">
+                        <div
+                          className="sa-company-logo font-mono"
+                          style={{ backgroundColor: `${comp.logoColor}20`, color: comp.logoColor }}
+                        >
+                          {comp.logo}
+                        </div>
+                        <div>
+                          <div className="sa-company-name font-semibold">{comp.name}</div>
+                          <div className="sa-company-sub font-mono">{comp.domain}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="sa-owner-name">{comp.owner?.name || 'Admin'}</div>
+                      <div className="sa-owner-email font-mono">{comp.owner?.email || comp.email}</div>
+                    </td>
+                    <td>
+                      <span className="sa-plan-pill font-mono">{comp.plan}</span>
+                    </td>
+                    <td>
+                      <span className="font-mono">{comp.usersCount} / {comp.userLimit || 20}</span>
+                    </td>
+                    <td>
+                      <StatusBadge status={comp.status} />
+                    </td>
+                    <td>
+                      <span className="sa-date-cell font-mono">{comp.joinedDate}</span>
+                    </td>
+                    <td className="text-right">
+                      <Link
+                        to={`/super-admin/companies/${comp.id}`}
+                        className="btn btn-secondary btn-xs font-mono"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile / Compact Tablet Card Representation */}
+          <div className="sa-mobile-only-cards">
+            {recentCompanies.map((comp) => (
+              <div key={comp.id} className="sa-mobile-entity-card">
+                <div className="sa-mobile-card-top">
+                  <div className="sa-company-cell">
+                    <div
+                      className="sa-company-logo font-mono"
+                      style={{ backgroundColor: `${comp.logoColor}20`, color: comp.logoColor }}
+                    >
+                      {comp.logo}
+                    </div>
+                    <div>
+                      <div className="sa-company-name font-semibold">{comp.name}</div>
+                      <div className="sa-company-sub font-mono">{comp.domain}</div>
+                    </div>
+                  </div>
+                  <StatusBadge status={comp.status} />
+                </div>
+
+                <div className="sa-mobile-card-details font-mono">
+                  <div className="sa-mobile-meta-row">
+                    <span className="sa-meta-lbl">Admin:</span>
+                    <span className="sa-meta-val">{comp.owner?.name || 'Admin'}</span>
+                  </div>
+                  <div className="sa-mobile-meta-row">
+                    <span className="sa-meta-lbl">Plan:</span>
+                    <span className="sa-plan-pill">{comp.plan}</span>
+                  </div>
+                  <div className="sa-mobile-meta-row">
+                    <span className="sa-meta-lbl">Users:</span>
+                    <span className="sa-meta-val">{comp.usersCount} / {comp.userLimit || 20}</span>
+                  </div>
+                  <div className="sa-mobile-meta-row">
+                    <span className="sa-meta-lbl">Joined:</span>
+                    <span className="sa-meta-val sa-date-cell">{comp.joinedDate}</span>
+                  </div>
+                </div>
+
+                <div className="sa-mobile-card-footer">
+                  <Link
+                    to={`/super-admin/companies/${comp.id}`}
+                    className="btn btn-secondary btn-xs font-mono btn-full text-center"
+                  >
+                    View Dossier &rarr;
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Live System Activity Feed */}
+      {/* <div className="sa-card sa-activity-card">
           <div className="sa-card-header">
             <div>
               <h2 className="sa-card-title">Recent Activities</h2>

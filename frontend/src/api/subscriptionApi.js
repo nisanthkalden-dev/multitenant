@@ -22,6 +22,35 @@ export const subscriptionApi = {
     return res.data;
   },
 
+  // Super Admin Plan Management
+  getSuperAdminPlans: async () => {
+    const res = await apiClient('/super-admin/plans');
+    return res.data;
+  },
+
+  createPlan: async (planData) => {
+    const res = await apiClient('/super-admin/plans', {
+      method: 'POST',
+      body: planData
+    });
+    return res.data;
+  },
+
+  updatePlan: async (id, planData) => {
+    const res = await apiClient(`/super-admin/plans/${id}`, {
+      method: 'PUT',
+      body: planData
+    });
+    return res.data;
+  },
+
+  deletePlan: async (id) => {
+    const res = await apiClient(`/super-admin/plans/${id}`, {
+      method: 'DELETE'
+    });
+    return res;
+  },
+
   // Tenant Company operations
   getPlans: async () => {
     const res = await apiClient('/subscription/plans');
