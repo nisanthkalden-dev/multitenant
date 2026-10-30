@@ -5,15 +5,6 @@ import { subscriptionApi } from '../../api/subscriptionApi';
 
 export default function SubscriptionPage() {
   const { user, companyId } = useAuth();
-  const company = MOCK_COMPANIES.find((c) => c.id === companyId) || {
-    name: user?.companyName || 'Acme Corporation',
-    plan: 'Growth',
-    billingCycle: 'Monthly',
-    price: '₹2,499',
-    status: 'Active',
-    renewalDate: 'Nov 24, 2026',
-    maxUsers: 20
-  const { user } = useAuth();
   const [sub, setSub] = useState(null);
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -76,16 +67,6 @@ export default function SubscriptionPage() {
       pageTitle="Company Subscription & Licensing"
       pageSubtitle={`Tier management, user quota, and invoicing for ${user?.companyName}`}
     >
-      {error && (
-        <div className="auth-alert alert-error font-mono mb-4">
-          <span>{error}</span>
-        </div>
-      )}
-
-          <div className="company-sub-card">
-            <div className="sub-tier-row">
-              <span className="sub-plan-badge font-mono">{company.plan.toUpperCase()} PLAN</span>
-              <span className="font-mono text-tertiary font-bold">{company.price ? company.price.replace(/\s*\/\s*(mo|yr|month|year|monthly)/i, '') : '—'}</span>
       {loading ? (
         <div className="font-mono text-center text-muted p-4">Loading subscription from database...</div>
       ) : (
