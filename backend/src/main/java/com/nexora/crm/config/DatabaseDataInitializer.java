@@ -142,6 +142,30 @@ public class DatabaseDataInitializer {
                 userRepository.save(companyAdmin);
             }
 
+            // 3b. Ensure Manager 'manager' exists for tenant COMP001
+            User manager = userRepository.findByUserIdIgnoreCase("manager")
+                    .or(() -> userRepository.findByEmailIgnoreCase("manager@acmecorp.com"))
+                    .orElse(null);
+
+            if (manager == null) {
+                log.info("Seeding Manager 'manager' (manager@acmecorp.com)...");
+                manager = new User();
+                manager.setUserId("manager");
+                manager.setFullName("Marcus Vance");
+                manager.setEmail("manager@acmecorp.com");
+                manager.setPasswordHash(passwordEncoder.encode("Password123"));
+                manager.setRole(RoleType.MANAGER);
+                manager.setCompany(comp1);
+                manager.setDepartment("Regional Sales");
+                manager.setStatus("Active");
+                manager.setIsActive(true);
+                manager.setAvatar("MV");
+                userRepository.save(manager);
+            } else if (!passwordEncoder.matches("Password123", manager.getPasswordHash())) {
+                manager.setPasswordHash(passwordEncoder.encode("Password123"));
+                userRepository.save(manager);
+            }
+
             // 4. Ensure Employee 'employee' exists for tenant COMP001
             User employee = userRepository.findByUserIdIgnoreCase("employee")
                     .or(() -> userRepository.findByEmailIgnoreCase("john.doe@acmecorp.com"))
