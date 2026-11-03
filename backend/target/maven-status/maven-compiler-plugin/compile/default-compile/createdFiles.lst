@@ -86,6 +86,7 @@ com\nexora\crm\dto\customer\CustomerResponse.class
 com\nexora\crm\security\JwtAuthenticationEntryPoint.class
 com\nexora\crm\service\PlatformSettingService.class
 com\nexora\crm\dto\company\CompanySettingDto.class
+com\nexora\crm\dto\user\EmployeeDetailsDto.class
 com\nexora\crm\entity\Task.class
 com\nexora\crm\dto\task\TaskResponse.class
 com\nexora\crm\security\CustomUserDetails.class

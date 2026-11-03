@@ -16,6 +16,7 @@ import CustomerDetailsPage from './pages/company/CustomerDetailsPage';
 import LeadsPage from './pages/company/LeadsPage';
 import TasksPage from './pages/company/TasksPage';
 import UsersPage from './pages/company/UsersPage';
+import EmployeeDetailsPage from './pages/company/EmployeeDetailsPage';
 import ReportsPage from './pages/company/ReportsPage';
 import SubscriptionPage from './pages/company/SubscriptionPage';
 import CompanySettingsPage from './pages/company/CompanySettingsPage';
@@ -103,6 +104,15 @@ export default function App() {
                 element={
                   <ProtectedRoute requiredRole="company_admin">
                     <UsersPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/company/users/:id"
+                element={
+                  <ProtectedRoute requiredRole={['company_admin', 'manager']}>
+                    <EmployeeDetailsPage />
                   </ProtectedRoute>
                 }
               />

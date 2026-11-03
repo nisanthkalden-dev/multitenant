@@ -36,6 +36,12 @@ public class User {
     private String department;
     private String phone;
 
+    @Column(name = "manager_id")
+    private String managerId;
+
+    @Column(name = "joining_date")
+    private String joiningDate;
+
     @Column(nullable = false)
     private String status = "Active";
 
@@ -141,6 +147,22 @@ public class User {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getManagerId() {
+        return managerId;
+    }
+
+    public void setManagerId(String managerId) {
+        this.managerId = managerId;
+    }
+
+    public String getJoiningDate() {
+        return joiningDate;
+    }
+
+    public void setJoiningDate(String joiningDate) {
+        this.joiningDate = joiningDate;
     }
 
     public String getStatus() {

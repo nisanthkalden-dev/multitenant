@@ -210,6 +210,18 @@ public class DashboardService {
         dto.setRole("company_admin");
 
         long employeesCount = userRepository.countByCompany_Id(companyId);
+        long activeEmployees = userRepository.countByCompany_IdAndStatusIgnoreCase(companyId, "Active");
+        long inactiveEmployees = userRepository.countByCompany_IdAndStatusIgnoreCase(companyId, "Inactive");
+
+        List<User> companyStaff = userRepository.findByCompany_Id(companyId);
+        Map<String, Long> employeesByDept = new HashMap<>();
+        Map<String, Long> employeesByRole = new HashMap<>();
+        for (User u : companyStaff) {
+            String dept = (u.getDepartment() != null && !u.getDepartment().isBlank()) ? u.getDepartment() : "General";
+            employeesByDept.put(dept, employeesByDept.getOrDefault(dept, 0L) + 1);
+            String r = u.getRole() != null ? u.getRole().name().toLowerCase() : "employee";
+            employeesByRole.put(r, employeesByRole.getOrDefault(r, 0L) + 1);
+        }
         long customersCount = customerRepository.countByCompany_Id(companyId);
         long leadsCount = leadRepository.countByCompany_Id(companyId);
         long pendingTasks = taskRepository.countByCompany_IdAndStatusIgnoreCase(companyId, "Pending");
@@ -226,6 +238,10 @@ public class DashboardService {
 
         Map<String, Object> metrics = new HashMap<>();
         metrics.put("totalEmployees", employeesCount);
+        metrics.put("activeEmployees", activeEmployees);
+        metrics.put("inactiveEmployees", inactiveEmployees);
+        metrics.put("employeesByDepartment", employeesByDept);
+        metrics.put("employeesByRole", employeesByRole);
         metrics.put("totalCustomers", customersCount);
         metrics.put("activeLeads", leadsCount);
         metrics.put("pendingTasks", pendingTasks);
