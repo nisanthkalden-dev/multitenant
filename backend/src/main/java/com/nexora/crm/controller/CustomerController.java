@@ -2,6 +2,9 @@ package com.nexora.crm.controller;
 
 import com.nexora.crm.dto.common.ApiResponse;
 import com.nexora.crm.dto.common.PaginationMetadata;
+import com.nexora.crm.dto.customer.ContractPaymentSummaryDto;
+import com.nexora.crm.dto.customer.CustomerPaymentDto;
+import com.nexora.crm.dto.customer.CustomerPaymentRequest;
 import com.nexora.crm.dto.customer.CustomerRequest;
 import com.nexora.crm.dto.customer.CustomerResponse;
 import com.nexora.crm.service.CustomerService;
@@ -21,7 +24,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/customers")
-@Tag(name = "Customer Management", description = "Multi-tenant CRM customer accounts")
+@Tag(name = "Customer Management", description = "Multi-tenant CRM customer accounts and contract payments")
 public class CustomerController {
 
     private final CustomerService customerService;
@@ -55,7 +58,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get customer by ID")
+    @Operation(summary = "Get customer by ID with contract payment financial summary")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerById(@PathVariable String id) {
         CustomerResponse res = customerService.getCustomerById(id);
         return ResponseEntity.ok(ApiResponse.ok("Customer retrieved successfully", res));
@@ -84,5 +87,37 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<Void>> deleteCustomer(@PathVariable String id) {
         customerService.deleteCustomer(id);
         return ResponseEntity.ok(ApiResponse.ok("Customer deleted successfully", null));
+    }
+
+    // =========================================================================
+    // Contract Payment Tracking APIs
+    // =========================================================================
+
+    @GetMapping("/{id}/payment-summary")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'MANAGER', 'SUPER_ADMIN')")
+    @Operation(summary = "Get contract payment summary (Total Contract Value, Total Paid, Remaining Balance)")
+    public ResponseEntity<ApiResponse<ContractPaymentSummaryDto>> getPaymentSummary(@PathVariable String id) {
+        ContractPaymentSummaryDto summary = customerService.getPaymentSummary(id);
+        return ResponseEntity.ok(ApiResponse.ok("Payment summary retrieved successfully", summary));
+    }
+
+    @GetMapping("/{id}/payments")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'MANAGER', 'SUPER_ADMIN')")
+    @Operation(summary = "Get customer payment history")
+    public ResponseEntity<ApiResponse<List<CustomerPaymentDto>>> getPaymentHistory(@PathVariable String id) {
+        List<CustomerPaymentDto> history = customerService.getPaymentHistory(id);
+        return ResponseEntity.ok(ApiResponse.ok("Payment history retrieved successfully", history));
+    }
+
+    @PostMapping("/{id}/payments")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'MANAGER', 'SUPER_ADMIN')")
+    @Operation(summary = "Record a contract payment for customer")
+    public ResponseEntity<ApiResponse<CustomerPaymentDto>> addPayment(
+            @PathVariable String id,
+            @Valid @RequestBody CustomerPaymentRequest request
+    ) {
+        CustomerPaymentDto payment = customerService.recordPayment(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok("Payment recorded successfully", payment));
     }
 }

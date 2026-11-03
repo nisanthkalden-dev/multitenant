@@ -22,6 +22,14 @@ public class DashboardController {
         this.dashboardService = dashboardService;
     }
 
+    @GetMapping("/company/revenue-report")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'MANAGER', 'SUPER_ADMIN')")
+    @Operation(summary = "Company financial revenue & settlement audit report (Total Revenue, Paid Amount, Balance)")
+    public ResponseEntity<ApiResponse<com.nexora.crm.dto.dashboard.CompanyRevenueReportDto>> getCompanyRevenueReport() {
+        com.nexora.crm.dto.dashboard.CompanyRevenueReportDto report = dashboardService.getCompanyRevenueReport();
+        return ResponseEntity.ok(ApiResponse.ok("Revenue report retrieved successfully", report));
+    }
+
     @GetMapping("/company/dashboard")
     @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Company Admin executive dashboard with team metrics, revenue, and activities")

@@ -2,12 +2,13 @@ package com.nexora.crm.service;
 
 import com.nexora.crm.dto.dashboard.CompanyDashboardDto;
 import com.nexora.crm.dto.dashboard.SuperAdminDashboardDto;
-import com.nexora.crm.entity.Activity;
-import com.nexora.crm.entity.Company;
-import com.nexora.crm.entity.Lead;
-import com.nexora.crm.entity.Subscription;
-import com.nexora.crm.entity.Task;
+import com.nexora.crm.entity.*;
 import com.nexora.crm.repository.*;
+import com.nexora.crm.dto.dashboard.CompanyRevenueReportDto;
+import com.nexora.crm.dto.dashboard.CompanyRevenueReportDto.CustomerRevenueBreakdownDto;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import com.nexora.crm.security.TenantContext;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -30,6 +31,8 @@ public class DashboardService {
     private final TaskRepository taskRepository;
     private final ActivityRepository activityRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final SubscriptionRevenueService subscriptionRevenueService;
+    private final CustomerPaymentRepository customerPaymentRepository;
     private final TenantContext tenantContext;
 
     public DashboardService(
@@ -40,8 +43,11 @@ public class DashboardService {
             TaskRepository taskRepository,
             ActivityRepository activityRepository,
             SubscriptionRepository subscriptionRepository,
+            SubscriptionRevenueService subscriptionRevenueService,
+            CustomerPaymentRepository customerPaymentRepository,
             TenantContext tenantContext
     ) {
+        this.customerPaymentRepository = customerPaymentRepository;
         this.companyRepository = companyRepository;
         this.userRepository = userRepository;
         this.customerRepository = customerRepository;
@@ -49,6 +55,7 @@ public class DashboardService {
         this.taskRepository = taskRepository;
         this.activityRepository = activityRepository;
         this.subscriptionRepository = subscriptionRepository;
+        this.subscriptionRevenueService = subscriptionRevenueService;
         this.tenantContext = tenantContext;
     }
 
@@ -69,10 +76,11 @@ public class DashboardService {
         // Active subscriptions in MySQL
         long activeSubscriptions = subscriptionRepository.countByStatusIgnoreCase("Active");
 
-        // Fetch all companies to calculate strictly real MRR from active companies
-        List<Company> allCompanies = companyRepository.findAll();
+        // Centralized MRR calculation from SubscriptionRevenueService
+        long currentMrr = subscriptionRevenueService.calculateMonthlyRecurringRevenue();
 
-        long currentMrr = 0;
+        // Plan distribution counts from active companies
+        List<Company> allCompanies = companyRepository.findAll();
         int starterCount = 0;
         int growthCount = 0;
         int scaleCount = 0;
@@ -84,18 +92,10 @@ public class DashboardService {
                 if (plan.contains("starter")) starterCount++;
                 else if (plan.contains("scale")) scaleCount++;
                 else growthCount++;
-
-                long numericPrice = parseNumericPrice(c.getPrice());
-                if ("Annual".equalsIgnoreCase(c.getBillingCycle())) {
-                    currentMrr += Math.round(numericPrice / 12.0);
-                } else {
-                    currentMrr += numericPrice;
-                }
             }
         }
 
-        // Calculate previous month MRR:
-        // Companies active today that were created before the current calendar month began
+        // Calculate previous month MRR for growth percentage
         YearMonth currentYm = YearMonth.now(ZoneId.systemDefault());
         Instant startOfCurrentMonth = currentYm.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
 
@@ -103,12 +103,7 @@ public class DashboardService {
         for (Company c : allCompanies) {
             boolean isActiveCompany = "Active".equalsIgnoreCase(c.getStatus()) && Boolean.TRUE.equals(c.getIsActive());
             if (isActiveCompany && c.getCreatedAt() != null && c.getCreatedAt().isBefore(startOfCurrentMonth)) {
-                long numericPrice = parseNumericPrice(c.getPrice());
-                if ("Annual".equalsIgnoreCase(c.getBillingCycle())) {
-                    previousMrr += Math.round(numericPrice / 12.0);
-                } else {
-                    previousMrr += numericPrice;
-                }
+                previousMrr += subscriptionRevenueService.normalizeToMonthly(c.getPrice(), c.getBillingCycle());
             }
         }
 
@@ -120,7 +115,6 @@ public class DashboardService {
             growthStr = String.format(Locale.US, "%+.1f%%", pct);
             trend = pct > 0 ? "up" : (pct < 0 ? "down" : "neutral");
         } else {
-            // Insufficient prior period records to compare against; safely return 0.0% instead of fabricating +100%
             growthStr = "0.0%";
             trend = "neutral";
         }
@@ -147,7 +141,7 @@ public class DashboardService {
         dto.setActiveSubscriptionsCount(activeSubscriptions);
         dto.setTotalUsersCount(totalUsers);
 
-        // Compute 6M and 1Y series dynamically from real database company records
+        // Compute 6M and 1Y series dynamically from real database company records using centralized normalization
         List<Map<String, Object>> rev6M = computeHistoricalRevenue(allCompanies, 6, currentYm);
         List<Map<String, Object>> rev1Y = computeHistoricalRevenue(allCompanies, 12, currentYm);
         dto.setRevenueMonthlyData6M(rev6M);
@@ -169,18 +163,14 @@ public class DashboardService {
         // Platform activities from actual recent audit activities
         List<Activity> recentActs = activityRepository.findAll(PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"))).getContent();
         List<Map<String, Object>> actList = new ArrayList<>();
-        if (!recentActs.isEmpty()) {
-            for (Activity a : recentActs) {
-                Map<String, Object> item = new HashMap<>();
-                item.put("id", a.getId());
-                item.put("type", a.getActivityType() != null ? a.getActivityType() : "company_joined");
-                item.put("title", a.getAction());
-                item.put("description", (a.getUserName() != null ? a.getUserName() + " - " : "") + (a.getTarget() != null ? a.getTarget() : ""));
-                item.put("timestamp", a.getCreatedAt() != null ? a.getCreatedAt().toString() : "Recently");
-                actList.add(item);
-            }
-        } else {
-            actList.add(Map.of("id", 1, "type", "company_joined", "title", "Platform Initialized", "description", "Database tenant isolation confirmed active", "timestamp", "Just now"));
+        for (Activity a : recentActs) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", a.getId());
+            item.put("type", a.getActivityType() != null ? a.getActivityType() : "company_joined");
+            item.put("title", a.getAction());
+            item.put("description", (a.getUserName() != null ? a.getUserName() + " - " : "") + (a.getTarget() != null ? a.getTarget() : ""));
+            item.put("timestamp", a.getCreatedAt() != null ? a.getCreatedAt().toString() : "Recently");
+            actList.add(item);
         }
         dto.setPlatformRecentActivities(actList);
 
@@ -199,12 +189,7 @@ public class DashboardService {
             for (Company c : companies) {
                 if ("Active".equalsIgnoreCase(c.getStatus()) && Boolean.TRUE.equals(c.getIsActive())) {
                     if (c.getCreatedAt() == null || !c.getCreatedAt().isAfter(endOfMonth)) {
-                        long numericPrice = parseNumericPrice(c.getPrice());
-                        if ("Annual".equalsIgnoreCase(c.getBillingCycle())) {
-                            monthRevenue += Math.round(numericPrice / 12.0);
-                        } else {
-                            monthRevenue += numericPrice;
-                        }
+                        monthRevenue += subscriptionRevenueService.normalizeToMonthly(c.getPrice(), c.getBillingCycle());
                     }
                 }
             }
@@ -217,22 +202,11 @@ public class DashboardService {
         return result;
     }
 
-    private long parseNumericPrice(String price) {
-        if (price == null || price.isBlank()) return 0;
-        String digits = price.replaceAll("[^0-9]", "");
-        if (digits.isBlank()) return 0;
-        try {
-            return Long.parseLong(digits);
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
     @Transactional(readOnly = true)
     public CompanyDashboardDto getCompanyAdminDashboard() {
         String companyId = tenantContext.getCurrentCompanyId();
         CompanyDashboardDto dto = new CompanyDashboardDto();
-        dto.setCompanyName(tenantContext.getCurrentUserDetails().getCompanyName());
+        dto.setCompanyName(tenantContext.getCurrentUserDetails() != null ? tenantContext.getCurrentUserDetails().getCompanyName() : null);
         dto.setRole("company_admin");
 
         long employeesCount = userRepository.countByCompany_Id(companyId);
@@ -240,15 +214,26 @@ public class DashboardService {
         long leadsCount = leadRepository.countByCompany_Id(companyId);
         long pendingTasks = taskRepository.countByCompany_IdAndStatusIgnoreCase(companyId, "Pending");
 
+        List<Customer> customers = customerRepository.findByCompany_Id(companyId);
+        long totalContractValue = 0;
+        for (Customer c : customers) {
+            totalContractValue += subscriptionRevenueService.parseNumericAmount(c.getContractValue());
+        }
+
+        List<Lead> leads = leadRepository.findByCompany_Id(companyId);
+        long wonLeads = leads.stream().filter(l -> "Closed Won".equalsIgnoreCase(l.getStage())).count();
+        String conversionRate = leads.isEmpty() ? "0%" : String.format(Locale.US, "%.1f%%", (wonLeads * 100.0) / leads.size());
+
         Map<String, Object> metrics = new HashMap<>();
         metrics.put("totalEmployees", employeesCount);
         metrics.put("totalCustomers", customersCount);
         metrics.put("activeLeads", leadsCount);
         metrics.put("pendingTasks", pendingTasks);
-        metrics.put("conversionRate", "68.4%");
-        metrics.put("monthlyRevenue", "₹24,80,000");
+        metrics.put("conversionRate", conversionRate);
+        metrics.put("monthlyRevenue", totalContractValue > 0 ? "₹" + String.format(Locale.US, "%,d", totalContractValue) : "₹0");
         dto.setMetrics(metrics);
 
+        populateSubscriptionSummary(dto, companyId);
         populateCommonTenantDashboardData(dto, companyId, null);
         return dto;
     }
@@ -257,7 +242,7 @@ public class DashboardService {
     public CompanyDashboardDto getManagerDashboard() {
         String companyId = tenantContext.getCurrentCompanyId();
         CompanyDashboardDto dto = new CompanyDashboardDto();
-        dto.setCompanyName(tenantContext.getCurrentUserDetails().getCompanyName());
+        dto.setCompanyName(tenantContext.getCurrentUserDetails() != null ? tenantContext.getCurrentUserDetails().getCompanyName() : null);
         dto.setRole("manager");
 
         long customersCount = customerRepository.countByCompany_Id(companyId);
@@ -265,41 +250,183 @@ public class DashboardService {
         long pendingTasks = taskRepository.countByCompany_IdAndStatusIgnoreCase(companyId, "Pending");
         long teamCount = userRepository.countByCompany_Id(companyId);
 
+        List<Lead> leads = leadRepository.findByCompany_Id(companyId);
+        long wonLeads = leads.stream().filter(l -> "Closed Won".equalsIgnoreCase(l.getStage())).count();
+        long pipelineTarget = 0;
+        for (Lead l : leads) {
+            pipelineTarget += subscriptionRevenueService.parseNumericAmount(l.getEstimatedValue());
+        }
+        String winRate = leads.isEmpty() ? "0%" : String.format(Locale.US, "%.1f%%", (wonLeads * 100.0) / leads.size());
+
         Map<String, Object> metrics = new HashMap<>();
+        metrics.put("totalEmployees", teamCount);
         metrics.put("teamMembers", teamCount);
+        metrics.put("totalCustomers", customersCount);
         metrics.put("managedCustomers", customersCount);
+        metrics.put("activeLeads", leadsCount);
         metrics.put("activeDeals", leadsCount);
+        metrics.put("pendingTasks", pendingTasks);
         metrics.put("openTasks", pendingTasks);
-        metrics.put("teamQuotaAttainment", "91.2%");
+        metrics.put("conversionRate", winRate);
+        metrics.put("teamQuotaAttainment", winRate);
+        metrics.put("monthlyRevenue", pipelineTarget > 0 ? "₹" + String.format(Locale.US, "%,d", pipelineTarget) : "₹0");
         dto.setMetrics(metrics);
 
+        populateSubscriptionSummary(dto, companyId);
         populateCommonTenantDashboardData(dto, companyId, null);
         return dto;
     }
 
     @Transactional(readOnly = true)
+    public CompanyRevenueReportDto getCompanyRevenueReport() {
+        String companyId = tenantContext.getCurrentCompanyId();
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new com.nexora.crm.exception.ResourceNotFoundException("Company not found: " + companyId));
+
+        List<Customer> customers = customerRepository.findByCompany_Id(companyId);
+        List<CustomerPayment> payments = customerPaymentRepository.findByCustomer_IdAndCompany_Id(
+                null, companyId, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "paymentDate")
+        );
+
+        BigDecimal totalContractRevenue = BigDecimal.ZERO;
+        BigDecimal totalPaidAmount = customerPaymentRepository.sumAmountByCompany(companyId);
+        if (totalPaidAmount == null) totalPaidAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        List<CustomerRevenueBreakdownDto> breakdownList = new ArrayList<>();
+        long settledCount = 0;
+        long pendingCount = 0;
+
+        for (Customer c : customers) {
+            BigDecimal cContract = CustomerService.parseContractValue(c.getContractValue());
+            totalContractRevenue = totalContractRevenue.add(cContract);
+
+            BigDecimal cPaid = customerPaymentRepository.sumAmountByCustomerAndCompany(c.getId(), companyId);
+            if (cPaid == null) cPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+            BigDecimal cRemaining = cContract.subtract(cPaid);
+            if (cRemaining.compareTo(BigDecimal.ZERO) < 0) cRemaining = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+            double cSettlementRate = 0.0;
+            if (cContract.compareTo(BigDecimal.ZERO) > 0) {
+                cSettlementRate = cPaid.divide(cContract, 4, RoundingMode.HALF_UP).doubleValue() * 100.0;
+                if (cSettlementRate > 100.0) cSettlementRate = 100.0;
+            } else if (cPaid.compareTo(BigDecimal.ZERO) > 0) {
+                cSettlementRate = 100.0;
+            }
+
+            String status = "Pending";
+            if (cContract.compareTo(BigDecimal.ZERO) > 0 && cRemaining.compareTo(BigDecimal.ZERO) == 0) {
+                status = "Settled";
+                settledCount++;
+            } else if (cPaid.compareTo(BigDecimal.ZERO) > 0) {
+                status = "Partially Paid";
+                pendingCount++;
+            } else {
+                status = "Pending";
+                pendingCount++;
+            }
+
+            CustomerRevenueBreakdownDto b = new CustomerRevenueBreakdownDto();
+            b.setCustomerId(c.getId());
+            b.setCustomerName(c.getName());
+            b.setContactPerson(c.getContactPerson());
+            b.setTier(c.getTier());
+            b.setIndustry(c.getIndustry());
+            b.setContractValue(cContract);
+            b.setPaidAmount(cPaid);
+            b.setRemainingBalance(cRemaining);
+            b.setFormattedContractValue(CustomerService.formatCurrency(cContract));
+            b.setFormattedPaidAmount(CustomerService.formatCurrency(cPaid));
+            b.setFormattedRemainingBalance(CustomerService.formatCurrency(cRemaining));
+            b.setSettlementPercentage(Math.round(cSettlementRate * 10.0) / 10.0);
+            b.setStatus(status);
+
+            breakdownList.add(b);
+        }
+
+        BigDecimal totalRemaining = totalContractRevenue.subtract(totalPaidAmount);
+        if (totalRemaining.compareTo(BigDecimal.ZERO) < 0) totalRemaining = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
+        double overallSettlementRate = 0.0;
+        if (totalContractRevenue.compareTo(BigDecimal.ZERO) > 0) {
+            overallSettlementRate = totalPaidAmount.divide(totalContractRevenue, 4, RoundingMode.HALF_UP).doubleValue() * 100.0;
+            if (overallSettlementRate > 100.0) overallSettlementRate = 100.0;
+        }
+
+        long paymentCount = customerPaymentRepository.count();
+
+        CompanyRevenueReportDto report = new CompanyRevenueReportDto();
+        report.setCompanyId(company.getId());
+        report.setCompanyName(company.getName());
+        report.setTotalContractRevenue(totalContractRevenue);
+        report.setTotalPaidAmount(totalPaidAmount);
+        report.setTotalRemainingBalance(totalRemaining);
+        report.setFormattedTotalRevenue(CustomerService.formatCurrency(totalContractRevenue));
+        report.setFormattedPaidAmount(CustomerService.formatCurrency(totalPaidAmount));
+        report.setFormattedRemainingBalance(CustomerService.formatCurrency(totalRemaining));
+        report.setSettlementPercentage(Math.round(overallSettlementRate * 10.0) / 10.0);
+        report.setTotalCustomersCount(customers.size());
+        report.setFullySettledCustomersCount(settledCount);
+        report.setPendingSettlementCustomersCount(pendingCount);
+        report.setTotalPaymentsCount(paymentCount);
+        report.setCustomerBreakdowns(breakdownList);
+
+        return report;
+    }
+
     public CompanyDashboardDto getEmployeeDashboard() {
         String companyId = tenantContext.getCurrentCompanyId();
         String userId = tenantContext.getCurrentUserId();
 
         CompanyDashboardDto dto = new CompanyDashboardDto();
-        dto.setCompanyName(tenantContext.getCurrentUserDetails().getCompanyName());
+        dto.setCompanyName(tenantContext.getCurrentUserDetails() != null ? tenantContext.getCurrentUserDetails().getCompanyName() : null);
         dto.setRole("employee");
 
         long myCustomers = customerRepository.countByCompany_IdAndAssignedTo(companyId, userId);
         long myLeads = leadRepository.countByCompany_IdAndAssignedTo(companyId, userId);
         long myPendingTasks = taskRepository.countByCompany_IdAndAssignedToAndStatusIgnoreCase(companyId, userId, "Pending");
 
+        List<Lead> assignedLeads = leadRepository.findByCompany_Id(companyId).stream()
+                .filter(l -> userId != null && userId.equalsIgnoreCase(l.getAssignedTo()))
+                .toList();
+        long myDealsWon = assignedLeads.stream().filter(l -> "Closed Won".equalsIgnoreCase(l.getStage())).count();
+        long myPipelineValue = 0;
+        for (Lead l : assignedLeads) {
+            myPipelineValue += subscriptionRevenueService.parseNumericAmount(l.getEstimatedValue());
+        }
+        String myWinRate = assignedLeads.isEmpty() ? "0%" : String.format(Locale.US, "%.1f%%", (myDealsWon * 100.0) / assignedLeads.size());
+
         Map<String, Object> metrics = new HashMap<>();
+        metrics.put("totalCustomers", myCustomers);
         metrics.put("myCustomers", myCustomers);
+        metrics.put("activeLeads", myLeads);
         metrics.put("myLeads", myLeads);
+        metrics.put("pendingTasks", myPendingTasks);
         metrics.put("myPendingTasks", myPendingTasks);
-        metrics.put("dealsWonThisMonth", 3);
-        metrics.put("pipelineValue", "₹18,20,000");
+        metrics.put("dealsWonThisMonth", myDealsWon);
+        metrics.put("conversionRate", myWinRate);
+        metrics.put("pipelineValue", myPipelineValue > 0 ? "₹" + String.format(Locale.US, "%,d", myPipelineValue) : "₹0");
+        metrics.put("monthlyRevenue", myPipelineValue > 0 ? "₹" + String.format(Locale.US, "%,d", myPipelineValue) : "₹0");
         dto.setMetrics(metrics);
 
+        populateSubscriptionSummary(dto, companyId);
         populateCommonTenantDashboardData(dto, companyId, userId);
         return dto;
+    }
+
+    private void populateSubscriptionSummary(CompanyDashboardDto dto, String companyId) {
+        if (companyId == null) return;
+        Company comp = companyRepository.findById(companyId).orElse(null);
+        if (comp == null) return;
+
+        Map<String, Object> subMap = new HashMap<>();
+        subMap.put("plan", comp.getPlan());
+        subMap.put("billingCycle", comp.getBillingCycle());
+        subMap.put("price", comp.getPrice());
+        subMap.put("status", comp.getStatus());
+        subMap.put("renewalDate", comp.getRenewalDate());
+        subMap.put("userLimit", comp.getUserLimit() != null ? comp.getUserLimit() : 20);
+        dto.setSubscriptionSummary(subMap);
     }
 
     private void populateCommonTenantDashboardData(CompanyDashboardDto dto, String companyId, String userIdFilter) {
@@ -314,11 +441,33 @@ public class DashboardService {
             m.put("id", l.getId());
             m.put("title", l.getTitle());
             m.put("company", l.getCompanyName());
+            m.put("companyName", l.getCompanyName());
+            m.put("contactName", l.getContactName());
             m.put("stage", l.getStage());
             m.put("value", l.getEstimatedValue());
+            m.put("estimatedValue", l.getEstimatedValue());
             leadMaps.add(m);
         }
         dto.setRecentLeads(leadMaps);
+
+        // Recent customers
+        List<Customer> customers = customerRepository.findByCompany_Id(companyId);
+        if (userIdFilter != null) {
+            customers = customers.stream().filter(c -> userIdFilter.equalsIgnoreCase(c.getAssignedTo())).toList();
+        }
+        List<Map<String, Object>> custMaps = new ArrayList<>();
+        for (Customer c : customers.stream().limit(5).toList()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", c.getId());
+            m.put("name", c.getName());
+            m.put("contactPerson", c.getContactPerson());
+            m.put("status", c.getStatus());
+            m.put("value", c.getContractValue());
+            m.put("contractValue", c.getContractValue());
+            m.put("assignedTo", c.getAssignedTo());
+            custMaps.add(m);
+        }
+        dto.setRecentCustomers(custMaps);
 
         // Recent tasks
         List<Task> tasks = taskRepository.findByCompany_Id(companyId);

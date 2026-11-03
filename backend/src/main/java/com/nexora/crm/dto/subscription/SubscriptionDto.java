@@ -18,6 +18,7 @@ public class SubscriptionDto {
     private String startDate;
     private String renewalDate;
     private Boolean autoRenew = true;
+    private Long monthlyRecurringRevenue;
 
     public SubscriptionDto() {}
 
@@ -115,5 +116,13 @@ public class SubscriptionDto {
 
     public void setAutoRenew(Boolean autoRenew) {
         this.autoRenew = autoRenew;
+    }
+
+    public Long getMonthlyRecurringRevenue() {
+        return monthlyRecurringRevenue;
+    }
+
+    public void setMonthlyRecurringRevenue(Long monthlyRecurringRevenue) {
+        this.monthlyRecurringRevenue = monthlyRecurringRevenue;
     }
 }

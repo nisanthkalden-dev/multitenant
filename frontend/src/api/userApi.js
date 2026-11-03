@@ -64,5 +64,13 @@ export const userApi = {
       body: passwordData
     });
     return res.data;
+  },
+
+  changeSuperAdminPassword: async (passwordData) => {
+    const res = await apiClient('/super-admin/settings/change-password', {
+      method: 'PUT',
+      body: passwordData
+    });
+    return res.data;
   }
 };

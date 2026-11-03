@@ -32,6 +32,7 @@ public class SubscriptionService {
     private final SubscriptionPlanRepository planRepository;
     private final CompanyRepository companyRepository;
     private final CompanySettingRepository settingRepository;
+    private final SubscriptionRevenueService subscriptionRevenueService;
     private final TenantContext tenantContext;
 
     public SubscriptionService(
@@ -39,12 +40,14 @@ public class SubscriptionService {
             SubscriptionPlanRepository planRepository,
             CompanyRepository companyRepository,
             CompanySettingRepository settingRepository,
+            SubscriptionRevenueService subscriptionRevenueService,
             TenantContext tenantContext
     ) {
         this.subscriptionRepository = subscriptionRepository;
         this.planRepository = planRepository;
         this.companyRepository = companyRepository;
         this.settingRepository = settingRepository;
+        this.subscriptionRevenueService = subscriptionRevenueService;
         this.tenantContext = tenantContext;
     }
 
@@ -132,8 +135,11 @@ public class SubscriptionService {
         List<SubscriptionDto> dtos = new ArrayList<>();
         Set<String> coveredCompanyIds = new HashSet<>();
 
+        long centralizedMrr = subscriptionRevenueService.calculateMonthlyRecurringRevenue();
+
         for (Subscription s : subscriptions) {
             SubscriptionDto dto = mapToSubscriptionDto(s);
+            dto.setMonthlyRecurringRevenue(centralizedMrr);
             dtos.add(dto);
             if (s.getCompany() != null && s.getCompany().getId() != null) {
                 coveredCompanyIds.add(s.getCompany().getId());
@@ -155,6 +161,7 @@ public class SubscriptionService {
                 dto.setStatus("—");
                 dto.setRenewalDate(c.getRenewalDate());
                 dto.setAutoRenew(false);
+                dto.setMonthlyRecurringRevenue(centralizedMrr);
                 dtos.add(dto);
             }
         }
@@ -250,23 +257,23 @@ public class SubscriptionService {
         SubscriptionPlan plan = new SubscriptionPlan();
         plan.setId(planId);
         plan.setName(cleanName);
-        plan.setTypeTag(request.getTypeTag() != null ? request.getTypeTag() : "CUSTOM");
-        plan.setBadge(request.getBadge());
-        plan.setSubtitle(request.getSubtitle() != null ? request.getSubtitle() : "Custom subscription plan");
-        
+        plan.setTypeTag(request.getTypeTag() != null ? request.getTypeTag().trim() : "TIER");
+        plan.setBadge(request.getBadge() != null ? request.getBadge().trim() : null);
+        plan.setSubtitle(request.getSubtitle() != null ? request.getSubtitle().trim() : "");
+
         java.math.BigDecimal monthly = request.getMonthlyPrice() != null ? request.getMonthlyPrice() : java.math.BigDecimal.ZERO;
         plan.setMonthlyPrice(monthly);
         plan.setAnnualPrice(request.getAnnualPrice() != null ? request.getAnnualPrice() : monthly.multiply(new java.math.BigDecimal("12")));
         plan.setPriceDisplay("₹" + monthly.stripTrailingZeros().toPlainString());
-        
-        int limit = request.getUserLimit() != null && request.getUserLimit() > 0 ? request.getUserLimit() : 20;
-        plan.setUserLimit(limit);
-        plan.setUserLimitText(request.getUserLimitText() != null ? request.getUserLimitText() : limit + " Team Members");
+        plan.setUserLimitText((request.getUserLimit() != null ? request.getUserLimit() : 20) + " Team Members");
+        plan.setUserLimit(request.getUserLimit() != null ? request.getUserLimit() : 20);
         plan.setIsPopular(Boolean.TRUE.equals(request.getPopular()));
         plan.setBadgeColor(request.getBadgeColor() != null ? request.getBadgeColor() : "var(--tertiary)");
 
         if (request.getFeatures() != null && !request.getFeatures().isEmpty()) {
             plan.setFeatures(String.join("\n", request.getFeatures()));
+        } else {
+            plan.setFeatures("");
         }
 
         SubscriptionPlan saved = planRepository.save(plan);
@@ -274,49 +281,36 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public SubscriptionPlanDto updatePlan(String planId, SubscriptionPlanDto request) {
-        SubscriptionPlan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new ResourceNotFoundException("Plan not found: " + planId));
+    public SubscriptionPlanDto updatePlan(String id, SubscriptionPlanDto request) {
+        SubscriptionPlan plan = planRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found: " + id));
 
         if (request.getName() != null && !request.getName().trim().isBlank()) {
             plan.setName(request.getName().trim());
         }
-        if (request.getTypeTag() != null) {
-            plan.setTypeTag(request.getTypeTag());
-        }
-        if (request.getBadge() != null) {
-            plan.setBadge(request.getBadge());
-        }
-        if (request.getSubtitle() != null) {
-            plan.setSubtitle(request.getSubtitle());
-        }
+        if (request.getTypeTag() != null) plan.setTypeTag(request.getTypeTag().trim());
+        if (request.getBadge() != null) plan.setBadge(request.getBadge().trim());
+        if (request.getSubtitle() != null) plan.setSubtitle(request.getSubtitle().trim());
+
         if (request.getMonthlyPrice() != null) {
-            if (request.getMonthlyPrice().compareTo(java.math.BigDecimal.ZERO) < 0) {
-                throw new com.nexora.crm.exception.BusinessRuleException("Plan price cannot be negative");
-            }
             plan.setMonthlyPrice(request.getMonthlyPrice());
             plan.setPriceDisplay("₹" + request.getMonthlyPrice().stripTrailingZeros().toPlainString());
-        }
-        if (request.getAnnualPrice() != null) {
-            plan.setAnnualPrice(request.getAnnualPrice());
-        } else if (request.getMonthlyPrice() != null) {
-            plan.setAnnualPrice(request.getMonthlyPrice().multiply(new java.math.BigDecimal("12")));
-        }
-        if (request.getUserLimit() != null && request.getUserLimit() > 0) {
-            plan.setUserLimit(request.getUserLimit());
-            if (request.getUserLimitText() == null) {
-                plan.setUserLimitText(request.getUserLimit() + " Team Members");
+            if (request.getAnnualPrice() != null) {
+                plan.setAnnualPrice(request.getAnnualPrice());
+            } else {
+                plan.setAnnualPrice(request.getMonthlyPrice().multiply(new java.math.BigDecimal("12")));
             }
+        } else if (request.getAnnualPrice() != null) {
+            plan.setAnnualPrice(request.getAnnualPrice());
         }
-        if (request.getUserLimitText() != null) {
-            plan.setUserLimitText(request.getUserLimitText());
+
+        if (request.getUserLimit() != null) {
+            plan.setUserLimit(request.getUserLimit());
+            plan.setUserLimitText(request.getUserLimit() + " Team Members");
         }
-        if (request.getPopular() != null) {
-            plan.setIsPopular(request.getPopular());
-        }
-        if (request.getBadgeColor() != null) {
-            plan.setBadgeColor(request.getBadgeColor());
-        }
+        if (request.getPopular() != null) plan.setIsPopular(request.getPopular());
+        if (request.getBadgeColor() != null) plan.setBadgeColor(request.getBadgeColor());
+
         if (request.getFeatures() != null) {
             plan.setFeatures(String.join("\n", request.getFeatures()));
         }
@@ -326,27 +320,28 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public void deletePlan(String planId) {
-        SubscriptionPlan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new ResourceNotFoundException("Plan not found: " + planId));
+    public void deletePlan(String id) {
+        SubscriptionPlan plan = planRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found: " + id));
 
-        // Safety verification: check if any subscriptions reference this plan by plan_name
-        boolean inUseBySubscription = subscriptionRepository.findAll().stream()
-                .anyMatch(s -> s.getPlanName() != null && s.getPlanName().equalsIgnoreCase(plan.getName()));
+        // Business Rule: Cannot delete a plan if any active companies or subscriptions currently use it
+        long companyUsage = companyRepository.findAll().stream()
+                .filter(c -> c.getPlan() != null && c.getPlan().equalsIgnoreCase(plan.getName()))
+                .count();
+        long subUsage = subscriptionRepository.findAll().stream()
+                .filter(s -> s.getPlanName() != null && s.getPlanName().equalsIgnoreCase(plan.getName()))
+                .count();
 
-        boolean inUseByCompany = companyRepository.findAll().stream()
-                .anyMatch(c -> c.getPlan() != null && c.getPlan().equalsIgnoreCase(plan.getName()));
-
-        if (inUseBySubscription || inUseByCompany) {
+        if (companyUsage > 0 || subUsage > 0) {
             throw new com.nexora.crm.exception.BusinessRuleException(
-                    "Cannot delete plan '" + plan.getName() + "' because it is currently assigned to existing companies or subscriptions."
+                    "Cannot delete plan '" + plan.getName() + "': It is actively assigned to " +
+                    (companyUsage + subUsage) + " organization(s) or subscription record(s)."
             );
         }
 
         planRepository.delete(plan);
     }
 
-    // Company Settings
     @Transactional(readOnly = true)
     public CompanySettingDto getCompanySettings() {
         String companyId = tenantContext.getCurrentCompanyId();

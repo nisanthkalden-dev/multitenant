@@ -39,6 +39,21 @@ export function AuthProvider({ children }) {
     setSession(null);
   };
 
+  const updateUser = (updatedUserData) => {
+    setSession((prevSession) => {
+      if (!prevSession) return prevSession;
+      const newSession = {
+        ...prevSession,
+        user: {
+          ...prevSession.user,
+          ...updatedUserData
+        }
+      };
+      localStorage.setItem('nexora_auth_session', JSON.stringify(newSession));
+      return newSession;
+    });
+  };
+
   const currentUser = session?.user || null;
   const currentRole = currentUser?.role || null;
   const companyId = currentUser?.companyId || null;
@@ -57,6 +72,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        updateUser,
         hasAccess: (path) => hasRouteAccess(currentRole, path)
       }}
     >

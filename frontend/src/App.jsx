@@ -12,6 +12,7 @@ import Register from './pages/Register';
 // Role-Based Company CRM Pages
 import RoleBasedDashboardRouter from './pages/company/RoleBasedDashboardRouter';
 import CustomersPage from './pages/company/CustomersPage';
+import CustomerDetailsPage from './pages/company/CustomerDetailsPage';
 import LeadsPage from './pages/company/LeadsPage';
 import TasksPage from './pages/company/TasksPage';
 import UsersPage from './pages/company/UsersPage';
@@ -65,6 +66,15 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <CustomersPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/company/customers/:id"
+                element={
+                  <ProtectedRoute>
+                    <CustomerDetailsPage />
                   </ProtectedRoute>
                 }
               />

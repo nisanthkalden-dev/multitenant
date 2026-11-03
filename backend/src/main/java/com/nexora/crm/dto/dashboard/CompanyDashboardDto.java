@@ -8,6 +8,7 @@ public class CompanyDashboardDto {
     private String role;
     private Map<String, Object> metrics;
     private List<Map<String, Object>> recentLeads;
+    private List<Map<String, Object>> recentCustomers;
     private List<Map<String, Object>> recentTasks;
     private List<Map<String, Object>> recentActivities;
     private Map<String, Object> subscriptionSummary;
@@ -44,6 +45,14 @@ public class CompanyDashboardDto {
 
     public void setRecentLeads(List<Map<String, Object>> recentLeads) {
         this.recentLeads = recentLeads;
+    }
+
+    public List<Map<String, Object>> getRecentCustomers() {
+        return recentCustomers;
+    }
+
+    public void setRecentCustomers(List<Map<String, Object>> recentCustomers) {
+        this.recentCustomers = recentCustomers;
     }
 
     public List<Map<String, Object>> getRecentTasks() {

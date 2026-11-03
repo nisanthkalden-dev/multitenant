@@ -266,6 +266,11 @@ public class UserService {
             throw new BusinessRuleException("New password is required.");
         }
 
+        String confirmPassword = request.getConfirmPassword();
+        if (confirmPassword != null && !confirmPassword.isBlank() && !confirmPassword.equals(newPassword)) {
+            throw new BusinessRuleException("New password and confirmation password do not match.");
+        }
+
         if (newPassword.length() < 6) {
             throw new BusinessRuleException("New password must be at least 6 characters.");
         }

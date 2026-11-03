@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useSuperAdmin } from '../../context/SuperAdminContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { userApi } from '../../api/userApi';
 import AdminLayout from '../../components/SuperAdmin/AdminLayout';
 
 export default function SuperAdminSettings() {
   const { theme: currentTheme, setTheme: setGlobalTheme } = useTheme();
+  const { updateUser } = useAuth();
   const {
     generalSettings,
     setGeneralSettings,
@@ -128,21 +130,31 @@ export default function SuperAdminSettings() {
       await userApi.updateProfile(payload);
       setProfileSettings(profileForm);
 
-      // Update session storage so avatar persists across refreshes and logout/login
-      try {
-        const rawSession = localStorage.getItem('nexora_auth_session');
-        if (rawSession) {
-          const session = JSON.parse(rawSession);
-          if (session.user) {
-            session.user.name = profileForm.fullName;
-            session.user.fullName = profileForm.fullName;
-            session.user.email = profileForm.email;
-            session.user.phone = profileForm.phone;
-            session.user.avatar = profileForm.avatarUrl || 'SA';
+      // Synchronize in AuthContext and localStorage
+      if (updateUser) {
+        updateUser({
+          name: profileForm.fullName,
+          fullName: profileForm.fullName,
+          email: profileForm.email,
+          phone: profileForm.phone,
+          avatar: profileForm.avatarUrl || 'SA'
+        });
+      } else {
+        try {
+          const rawSession = localStorage.getItem('nexora_auth_session');
+          if (rawSession) {
+            const session = JSON.parse(rawSession);
+            if (session.user) {
+              session.user.name = profileForm.fullName;
+              session.user.fullName = profileForm.fullName;
+              session.user.email = profileForm.email;
+              session.user.phone = profileForm.phone;
+              session.user.avatar = profileForm.avatarUrl || 'SA';
+            }
+            localStorage.setItem('nexora_auth_session', JSON.stringify(session));
           }
-          localStorage.setItem('nexora_auth_session', JSON.stringify(session));
-        }
-      } catch (ignored) { }
+        } catch (ignored) { }
+      }
 
       if (refreshAll) {
         await refreshAll();
@@ -159,22 +171,26 @@ export default function SuperAdminSettings() {
     setIsRemovingAvatar(true);
     setSaveError('');
     try {
-      const updatedUser = await userApi.removeAvatar();
+      await userApi.removeAvatar();
       setProfileForm((prev) => ({ ...prev, avatarUrl: null }));
       setProfileSettings((prev) => ({ ...prev, avatarUrl: null }));
       if (profileFileInputRef.current) profileFileInputRef.current.value = '';
 
-      // Clear avatar from localStorage session
-      try {
-        const rawSession = localStorage.getItem('nexora_auth_session');
-        if (rawSession) {
-          const session = JSON.parse(rawSession);
-          if (session.user) {
-            session.user.avatar = null;
+      // Clear avatar in AuthContext and localStorage session
+      if (updateUser) {
+        updateUser({ avatar: null });
+      } else {
+        try {
+          const rawSession = localStorage.getItem('nexora_auth_session');
+          if (rawSession) {
+            const session = JSON.parse(rawSession);
+            if (session.user) {
+              session.user.avatar = null;
+            }
+            localStorage.setItem('nexora_auth_session', JSON.stringify(session));
           }
-          localStorage.setItem('nexora_auth_session', JSON.stringify(session));
-        }
-      } catch (ignored) { }
+        } catch (ignored) { }
+      }
 
       if (refreshAll) {
         await refreshAll();
@@ -245,10 +261,11 @@ export default function SuperAdminSettings() {
 
     setPasswordSubmitting(true);
     try {
-      await userApi.changePassword({
+      await userApi.changeSuperAdminPassword({
         currentPassword: securityPassword.currentPassword,
         oldPassword: securityPassword.currentPassword,
-        newPassword: securityPassword.newPassword
+        newPassword: securityPassword.newPassword,
+        confirmPassword: securityPassword.confirmPassword
       });
       setSecurityPassword({ currentPassword: '', newPassword: '', confirmPassword: '' });
       showSaveSuccess('Password updated successfully');
