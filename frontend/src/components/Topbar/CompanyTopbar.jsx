@@ -2,7 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ThemeToggle from '../ThemeToggle/ThemeToggle';
-import { ROLE_LABELS } from '../../data/mockUsers';
+const ROLE_LABELS = {
+  super_admin: 'Super Admin',
+  company_admin: 'Company Admin',
+  manager: 'Manager',
+  employee: 'Employee'
+};
 
 export default function CompanyTopbar({ onToggleMobile }) {
   const { user, role, logout } = useAuth();

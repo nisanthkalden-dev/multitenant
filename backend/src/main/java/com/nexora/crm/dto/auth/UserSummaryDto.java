@@ -13,7 +13,11 @@ public class UserSummaryDto {
     private String avatar;
     private String department;
     private String phone;
+    private String managerId;
+    private String managerName;
+    private String joiningDate;
     private String status;
+    private String createdAt;
 
     public UserSummaryDto() {}
 
@@ -113,11 +117,43 @@ public class UserSummaryDto {
         this.phone = phone;
     }
 
+    public String getManagerId() {
+        return managerId;
+    }
+
+    public void setManagerId(String managerId) {
+        this.managerId = managerId;
+    }
+
+    public String getManagerName() {
+        return managerName;
+    }
+
+    public void setManagerName(String managerName) {
+        this.managerName = managerName;
+    }
+
+    public String getJoiningDate() {
+        return joiningDate;
+    }
+
+    public void setJoiningDate(String joiningDate) {
+        this.joiningDate = joiningDate;
+    }
+
     public String getStatus() {
         return status;
     }
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(String createdAt) {
+        this.createdAt = createdAt;
     }
 }

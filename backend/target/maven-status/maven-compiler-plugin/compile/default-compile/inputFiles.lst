@@ -46,6 +46,7 @@ E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\subscription\Subs
 E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\subscription\SubscriptionUpdateRequest.java
 E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\task\TaskRequest.java
 E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\task\TaskResponse.java
+E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\user\EmployeeDetailsDto.java
 E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\user\PasswordChangeRequest.java
 E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\user\UserCreateRequest.java
 E:\github\multitenant\backend\src\main\java\com\nexora\crm\dto\user\UserUpdateRequest.java
