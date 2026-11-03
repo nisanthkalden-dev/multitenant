@@ -50,7 +50,7 @@ public class DatabaseDataInitializer {
                 userRepository.save(superAdmin);
                 log.info("Super Admin user successfully created.");
             } else {
-                // Ensure role is SUPER_ADMIN, company is null, active is true, and password is valid BCrypt
+                // Ensure role is SUPER_ADMIN, company is null, active is true
                 boolean updated = false;
                 if (superAdmin.getCompany() != null) {
                     superAdmin.setCompany(null);
@@ -65,9 +65,8 @@ public class DatabaseDataInitializer {
                     superAdmin.setStatus("Active");
                     updated = true;
                 }
-                // Ensure Super Admin has valid BCrypt password hash matching "SuperAdmin123!"
-                if (superAdmin.getPasswordHash() == null || superAdmin.getPasswordHash().isBlank()
-                        || !passwordEncoder.matches("SuperAdmin123!", superAdmin.getPasswordHash())) {
+                // Only initialize password if empty/missing to avoid overwriting user password changes on restart
+                if (superAdmin.getPasswordHash() == null || superAdmin.getPasswordHash().isBlank()) {
                     log.info("Setting Super Admin initial password hash to BCrypt('SuperAdmin123!')...");
                     superAdmin.setPasswordHash(passwordEncoder.encode("SuperAdmin123!"));
                     updated = true;
@@ -137,9 +136,33 @@ public class DatabaseDataInitializer {
                 companyAdmin.setIsActive(true);
                 companyAdmin.setAvatar("SW");
                 userRepository.save(companyAdmin);
-            } else if (!passwordEncoder.matches("Password123", companyAdmin.getPasswordHash())) {
+            } else if (companyAdmin.getPasswordHash() == null || companyAdmin.getPasswordHash().isBlank()) {
                 companyAdmin.setPasswordHash(passwordEncoder.encode("Password123"));
                 userRepository.save(companyAdmin);
+            }
+
+            // 3b. Ensure Manager 'manager' exists for tenant COMP001
+            User manager = userRepository.findByUserIdIgnoreCase("manager")
+                    .or(() -> userRepository.findByEmailIgnoreCase("manager@acmecorp.com"))
+                    .orElse(null);
+
+            if (manager == null) {
+                log.info("Seeding Manager 'manager' (manager@acmecorp.com)...");
+                manager = new User();
+                manager.setUserId("manager");
+                manager.setFullName("Marcus Vance");
+                manager.setEmail("manager@acmecorp.com");
+                manager.setPasswordHash(passwordEncoder.encode("Password123"));
+                manager.setRole(RoleType.MANAGER);
+                manager.setCompany(comp1);
+                manager.setDepartment("Regional Sales");
+                manager.setStatus("Active");
+                manager.setIsActive(true);
+                manager.setAvatar("MV");
+                userRepository.save(manager);
+            } else if (manager.getPasswordHash() == null || manager.getPasswordHash().isBlank()) {
+                manager.setPasswordHash(passwordEncoder.encode("Password123"));
+                userRepository.save(manager);
             }
 
             // 4. Ensure Employee 'employee' exists for tenant COMP001
@@ -161,7 +184,7 @@ public class DatabaseDataInitializer {
                 employee.setIsActive(true);
                 employee.setAvatar("JD");
                 userRepository.save(employee);
-            } else if (!passwordEncoder.matches("Password123", employee.getPasswordHash())) {
+            } else if (employee.getPasswordHash() == null || employee.getPasswordHash().isBlank()) {
                 employee.setPasswordHash(passwordEncoder.encode("Password123"));
                 userRepository.save(employee);
             }
@@ -219,7 +242,7 @@ public class DatabaseDataInitializer {
                     madara.setCompany(uchiha);
                     userRepository.save(madara);
                 }
-                if (!passwordEncoder.matches("Password123", madara.getPasswordHash())) {
+                if (madara.getPasswordHash() == null || madara.getPasswordHash().isBlank()) {
                     madara.setPasswordHash(passwordEncoder.encode("Password123"));
                     userRepository.save(madara);
                 }

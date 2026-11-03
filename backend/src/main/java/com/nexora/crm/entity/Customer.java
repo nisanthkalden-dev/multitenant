@@ -42,6 +42,15 @@ public class Customer {
     @Column(name = "last_contact")
     private String lastContact;
 
+    @Column(length = 255)
+    private String address;
+
+    @Column(name = "contract_start_date", length = 50)
+    private String contractStartDate;
+
+    @Column(name = "contract_end_date", length = 50)
+    private String contractEndDate;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
@@ -161,6 +170,30 @@ public class Customer {
 
     public void setLastContact(String lastContact) {
         this.lastContact = lastContact;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getContractStartDate() {
+        return contractStartDate;
+    }
+
+    public void setContractStartDate(String contractStartDate) {
+        this.contractStartDate = contractStartDate;
+    }
+
+    public String getContractEndDate() {
+        return contractEndDate;
+    }
+
+    public void setContractEndDate(String contractEndDate) {
+        this.contractEndDate = contractEndDate;
     }
 
     public Instant getCreatedAt() {

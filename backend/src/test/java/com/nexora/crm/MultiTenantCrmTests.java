@@ -973,4 +973,303 @@ public class MultiTenantCrmTests {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message", containsString("Your company account is suspended")));
     }
+
+    @Test
+    @DisplayName("Super Admin Settings Password Change Flow: Validation, BCrypt Hash, Login Failure on Old & Success on New")
+    void testSuperAdminPasswordChangeFlow() throws Exception {
+        // 1. Login with current Super Admin credentials
+        SuperAdminLoginRequest loginReq = new SuperAdminLoginRequest();
+        loginReq.setEmail("superadmin");
+        loginReq.setPassword("SuperAdmin123!");
+
+        MvcResult loginRes = mockMvc.perform(post("/api/super-admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String token = objectMapper.readTree(loginRes.getResponse().getContentAsString())
+                .path("accessToken").asText();
+
+        // 2. Reject mismatched confirm password
+        com.nexora.crm.dto.user.PasswordChangeRequest mismatchReq = new com.nexora.crm.dto.user.PasswordChangeRequest();
+        mismatchReq.setCurrentPassword("SuperAdmin123!");
+        mismatchReq.setNewPassword("NewPass123!@#");
+        mismatchReq.setConfirmPassword("DifferentPass!@#");
+
+        mockMvc.perform(put("/api/super-admin/settings/change-password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(mismatchReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("do not match")));
+
+        // 3. Reject incorrect current password
+        com.nexora.crm.dto.user.PasswordChangeRequest wrongCurrentReq = new com.nexora.crm.dto.user.PasswordChangeRequest();
+        wrongCurrentReq.setCurrentPassword("WrongCurrentPass!");
+        wrongCurrentReq.setNewPassword("NewPass123!@#");
+        wrongCurrentReq.setConfirmPassword("NewPass123!@#");
+
+        mockMvc.perform(put("/api/super-admin/settings/change-password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(wrongCurrentReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("Incorrect current password")));
+
+        // 4. Reject same new password as current password
+        com.nexora.crm.dto.user.PasswordChangeRequest samePassReq = new com.nexora.crm.dto.user.PasswordChangeRequest();
+        samePassReq.setCurrentPassword("SuperAdmin123!");
+        samePassReq.setNewPassword("SuperAdmin123!");
+        samePassReq.setConfirmPassword("SuperAdmin123!");
+
+        mockMvc.perform(put("/api/super-admin/settings/change-password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(samePassReq)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("cannot be the same")));
+
+        // 5. Successful password update
+        com.nexora.crm.dto.user.PasswordChangeRequest successReq = new com.nexora.crm.dto.user.PasswordChangeRequest();
+        successReq.setCurrentPassword("SuperAdmin123!");
+        successReq.setNewPassword("UpdatedMasterPass123!");
+        successReq.setConfirmPassword("UpdatedMasterPass123!");
+
+        mockMvc.perform(put("/api/super-admin/settings/change-password")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(successReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.message", containsString("successfully")));
+
+        // 6. Verify in database: stored as BCrypt and matches new password, not old
+        com.nexora.crm.entity.User dbSuperAdmin = userRepository.findByUserIdIgnoreCase("superadmin").orElseThrow();
+        org.junit.jupiter.api.Assertions.assertTrue(dbSuperAdmin.getPasswordHash().startsWith("$") || dbSuperAdmin.getPasswordHash().startsWith("$") || dbSuperAdmin.getPasswordHash().startsWith("$"), "Must be BCrypt hash");
+
+        // 7. Verify login with old password fails
+        SuperAdminLoginRequest oldLoginReq = new SuperAdminLoginRequest();
+        oldLoginReq.setEmail("superadmin");
+        oldLoginReq.setPassword("SuperAdmin123!");
+
+        mockMvc.perform(post("/api/super-admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(oldLoginReq)))
+                .andExpect(status().isUnauthorized());
+
+        // 8. Verify login with new password succeeds
+        SuperAdminLoginRequest newLoginReq = new SuperAdminLoginRequest();
+        newLoginReq.setEmail("superadmin");
+        newLoginReq.setPassword("UpdatedMasterPass123!");
+
+        mockMvc.perform(post("/api/super-admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(newLoginReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken", notNullValue()));
+
+        // Restore original password for other tests
+        com.nexora.crm.dto.user.PasswordChangeRequest restoreReq = new com.nexora.crm.dto.user.PasswordChangeRequest();
+        restoreReq.setCurrentPassword("UpdatedMasterPass123!");
+        restoreReq.setNewPassword("SuperAdmin123!");
+        restoreReq.setConfirmPassword("SuperAdmin123!");
+
+        MvcResult newLoginRes = mockMvc.perform(post("/api/super-admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(newLoginReq)))
+                .andReturn();
+        String newToken = objectMapper.readTree(newLoginRes.getResponse().getContentAsString()).path("accessToken").asText();
+
+        mockMvc.perform(put("/api/super-admin/settings/change-password")
+                        .header("Authorization", "Bearer " + newToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(restoreReq)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("Centralized MRR Consistency: Super Admin Dashboard MRR and Subscription API MRR must match")
+    void testCentralizedMrrConsistency() throws Exception {
+        SuperAdminLoginRequest loginReq = new SuperAdminLoginRequest();
+        loginReq.setEmail("superadmin");
+        loginReq.setPassword("SuperAdmin123!");
+
+        MvcResult loginRes = mockMvc.perform(post("/api/super-admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        String token = objectMapper.readTree(loginRes.getResponse().getContentAsString())
+                .path("accessToken").asText();
+
+        // 1. Fetch Dashboard MRR
+        MvcResult dashRes = mockMvc.perform(get("/api/super-admin/dashboard")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        long dashMrr = objectMapper.readTree(dashRes.getResponse().getContentAsString())
+                .path("data").path("currentMrr").asLong();
+
+        // 2. Fetch Subscriptions API MRR
+        MvcResult subsRes = mockMvc.perform(get("/api/super-admin/subscriptions")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        long subsMrr = objectMapper.readTree(subsRes.getResponse().getContentAsString())
+                .path("meta").path("monthlyRecurringRevenue").asLong();
+
+        // 3. Both values must be identical
+        org.junit.jupiter.api.Assertions.assertEquals(dashMrr, subsMrr, "Dashboard MRR and Subscriptions API MRR must be equal");
+    }
+
+    @Test
+    @DisplayName("Customer Details & Contract Payment Tracking Integration Test")
+    void testCustomerDetailsAndPaymentTrackingFlow() throws Exception {
+        // 1. Login as Company Admin for COMP001
+        String token = getAuthToken("admin@acmecorp.com", "Password123", "company");
+
+        // 2. Create customer with contract value of 8,00,000
+        com.nexora.crm.dto.customer.CustomerRequest custReq = new com.nexora.crm.dto.customer.CustomerRequest();
+        custReq.setName("ACTE Tech Innovations");
+        custReq.setContactPerson("Anil Kumar");
+        custReq.setEmail("anil@actetech.in");
+        custReq.setPhone("9089090999");
+        custReq.setIndustry("Technology");
+        custReq.setTier("Enterprise");
+        custReq.setContractValue("₹8,00,000");
+        custReq.setContractStartDate("2026-01-01");
+        custReq.setContractEndDate("2026-12-31");
+        custReq.setAddress("Tower 4, Electronic City, Bengaluru");
+
+        MvcResult createRes = mockMvc.perform(post("/api/customers")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(custReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id", notNullValue()))
+                .andReturn();
+
+        String custId = objectMapper.readTree(createRes.getResponse().getContentAsString())
+                .path("data").path("id").asText();
+
+        // 3. Get customer details: initial contract payment summary
+        mockMvc.perform(get("/api/customers/" + custId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name", is("ACTE Tech Innovations")))
+                .andExpect(jsonPath("$.data.totalContractAmount", is(800000.00)))
+                .andExpect(jsonPath("$.data.totalAmountPaid", is(0.00)))
+                .andExpect(jsonPath("$.data.remainingBalance", is(800000.00)))
+                .andExpect(jsonPath("$.data.formattedRemainingBalance", is("₹8,00,000")));
+
+        // 4. Update customer information via Edit
+        custReq.setContactPerson("Anil K. Sharma");
+        custReq.setPhone("9876543210");
+        mockMvc.perform(put("/api/customers/" + custId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(custReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contactPerson", is("Anil K. Sharma")));
+
+        // 5. Add First Payment: 2,00,000
+        com.nexora.crm.dto.customer.CustomerPaymentRequest pay1 = new com.nexora.crm.dto.customer.CustomerPaymentRequest();
+        pay1.setAmount(new java.math.BigDecimal("200000.00"));
+        pay1.setPaymentDate(java.time.LocalDate.now());
+        pay1.setPaymentMethod("Bank Transfer");
+        pay1.setTransactionId("TXN-10001");
+        pay1.setNotes("First installment 25%");
+
+        mockMvc.perform(post("/api/customers/" + custId + "/payments")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(pay1)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.amount", is(200000.00)));
+
+        // 6. Verify Contract Payment Summary: Total Paid = 2,00,000, Remaining = 6,00,000
+        mockMvc.perform(get("/api/customers/" + custId + "/payment-summary")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalContractAmount", is(800000.00)))
+                .andExpect(jsonPath("$.data.totalAmountPaid", is(200000.00)))
+                .andExpect(jsonPath("$.data.remainingBalance", is(600000.00)))
+                .andExpect(jsonPath("$.data.formattedRemainingBalance", is("₹6,00,000")));
+
+        // 7. Add Second Payment: 1,50,000
+        com.nexora.crm.dto.customer.CustomerPaymentRequest pay2 = new com.nexora.crm.dto.customer.CustomerPaymentRequest();
+        pay2.setAmount(new java.math.BigDecimal("150000.00"));
+        pay2.setPaymentDate(java.time.LocalDate.now());
+        pay2.setPaymentMethod("UPI");
+        pay2.setTransactionId("TXN-10002");
+
+        mockMvc.perform(post("/api/customers/" + custId + "/payments")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(pay2)))
+                .andExpect(status().isCreated());
+
+        // 8. Add Third Payment: 50,000 (Total Paid = 4,00,000, Remaining = 4,00,000)
+        com.nexora.crm.dto.customer.CustomerPaymentRequest pay3 = new com.nexora.crm.dto.customer.CustomerPaymentRequest();
+        pay3.setAmount(new java.math.BigDecimal("50000.00"));
+        pay3.setPaymentDate(java.time.LocalDate.now());
+        pay3.setPaymentMethod("Bank Transfer");
+
+        mockMvc.perform(post("/api/customers/" + custId + "/payments")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(pay3)))
+                .andExpect(status().isCreated());
+
+        // Verify Payment History list (ordered newest first)
+        MvcResult historyRes = mockMvc.perform(get("/api/customers/" + custId + "/payments")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()", is(3)))
+                .andReturn();
+
+        // 9. Rejection test: Payment exceeding remaining balance (remaining = 4,00,000, attempt = 5,00,000)
+        com.nexora.crm.dto.customer.CustomerPaymentRequest overPay = new com.nexora.crm.dto.customer.CustomerPaymentRequest();
+        overPay.setAmount(new java.math.BigDecimal("500000.00"));
+        overPay.setPaymentDate(java.time.LocalDate.now());
+        overPay.setPaymentMethod("Bank Transfer");
+
+        mockMvc.perform(post("/api/customers/" + custId + "/payments")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(overPay)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("exceeds the remaining contract balance")));
+
+        // 10. Multi-tenant security test: Another company admin cannot view or pay against this customer
+        // Seed an admin in a different tenant (COMP009) or check isolation
+        com.nexora.crm.entity.Company comp2 = companyRepository.findById("COMP002").orElse(null);
+        if (comp2 != null) {
+            com.nexora.crm.entity.User otherAdminUser = new com.nexora.crm.entity.User();
+            otherAdminUser.setUserId("iso_admin_" + System.currentTimeMillis());
+            otherAdminUser.setEmail("iso_" + System.currentTimeMillis() + "@zenith.org");
+            otherAdminUser.setFullName("Isolation Admin");
+            otherAdminUser.setPasswordHash(testPasswordEncoder.encode("Password123"));
+            otherAdminUser.setRole(com.nexora.crm.entity.RoleType.COMPANY_ADMIN);
+            otherAdminUser.setCompany(comp2);
+            otherAdminUser.setIsActive(true);
+            otherAdminUser.setStatus("Active");
+            userRepository.save(otherAdminUser);
+
+            String otherToken = getAuthToken(otherAdminUser.getEmail(), "Password123", "company");
+            mockMvc.perform(get("/api/customers/" + custId)
+                            .header("Authorization", "Bearer " + otherToken))
+                    .andExpect(status().isNotFound());
+
+            mockMvc.perform(post("/api/customers/" + custId + "/payments")
+                            .header("Authorization", "Bearer " + otherToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(pay1)))
+                    .andExpect(status().isNotFound());
+        }
+    }
 }

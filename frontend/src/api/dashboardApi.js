@@ -19,5 +19,10 @@ export const dashboardApi = {
   getEmployeeDashboard: async () => {
     const res = await apiClient('/employee/dashboard');
     return res.data;
+  },
+
+  getCompanyRevenueReport: async () => {
+    const res = await apiClient('/company/revenue-report');
+    return res.data;
   }
 };

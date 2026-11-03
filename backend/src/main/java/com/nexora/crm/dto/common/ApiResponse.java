@@ -3,6 +3,7 @@ package com.nexora.crm.dto.common;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
+import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
@@ -10,6 +11,7 @@ public class ApiResponse<T> {
     private String message;
     private T data;
     private PaginationMetadata pagination;
+    private Map<String, Object> meta;
     private int status;
     private Instant timestamp;
 
@@ -42,12 +44,26 @@ public class ApiResponse<T> {
         this.status = 200;
     }
 
+    public ApiResponse(boolean success, String message, T data, PaginationMetadata pagination, Map<String, Object> meta) {
+        this.success = success;
+        this.message = message;
+        this.data = data;
+        this.pagination = pagination;
+        this.meta = meta;
+        this.timestamp = Instant.now();
+        this.status = 200;
+    }
+
     public static <T> ApiResponse<T> ok(String message, T data) {
         return new ApiResponse<>(true, message, data, 200);
     }
 
     public static <T> ApiResponse<T> ok(String message, T data, PaginationMetadata pagination) {
         return new ApiResponse<>(true, message, data, pagination);
+    }
+
+    public static <T> ApiResponse<T> ok(String message, T data, PaginationMetadata pagination, Map<String, Object> meta) {
+        return new ApiResponse<>(true, message, data, pagination, meta);
     }
 
     public static <T> ApiResponse<T> error(String message, int status) {
@@ -84,6 +100,14 @@ public class ApiResponse<T> {
 
     public void setPagination(PaginationMetadata pagination) {
         this.pagination = pagination;
+    }
+
+    public Map<String, Object> getMeta() {
+        return meta;
+    }
+
+    public void setMeta(Map<String, Object> meta) {
+        this.meta = meta;
     }
 
     public int getStatus() {

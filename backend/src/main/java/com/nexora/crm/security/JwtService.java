@@ -173,6 +173,10 @@ public class JwtService {
         });
     }
 
+    public String extractUserIdentifier(String token) {
+        return extractAccessClaim(token, claims -> claims.get("userIdentifier", String.class));
+    }
+
     public String extractRole(String token) {
         return extractAccessClaim(token, claims -> claims.get(CLAIM_ROLE, String.class));
     }

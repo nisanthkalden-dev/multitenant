@@ -1,4 +1,6 @@
 com\nexora\crm\repository\PlatformSettingRepository.class
+com\nexora\crm\dto\dashboard\CompanyRevenueReportDto$CustomerRevenueBreakdownDto.class
+com\nexora\crm\entity\CustomerPayment.class
 com\nexora\crm\entity\Contact.class
 com\nexora\crm\repository\UserRepository.class
 com\nexora\crm\service\AuthService.class
@@ -14,6 +16,7 @@ com\nexora\crm\repository\ContactRepository.class
 com\nexora\crm\security\TenantContext.class
 com\nexora\crm\exception\BusinessRuleException.class
 com\nexora\crm\PasswordGenerator.class
+com\nexora\crm\dto\customer\CustomerPaymentDto.class
 com\nexora\crm\entity\CompanySetting.class
 com\nexora\crm\security\JwtAccessDeniedHandler.class
 com\nexora\crm\dto\lead\LeadRequest.class
@@ -54,9 +57,11 @@ com\nexora\crm\entity\Company.class
 com\nexora\crm\dto\subscription\SubscriptionDto.class
 com\nexora\crm\dto\dashboard\CompanyDashboardDto.class
 com\nexora\crm\dto\activity\ActivityResponse.class
+com\nexora\crm\dto\customer\ContractPaymentSummaryDto.class
 com\nexora\crm\dto\company\CompanyResponse.class
 com\nexora\crm\controller\TaskController.class
 com\nexora\crm\repository\CustomerRepository.class
+com\nexora\crm\repository\CustomerPaymentRepository.class
 com\nexora\crm\dto\company\CompanyRequest.class
 com\nexora\crm\dto\subscription\SubscriptionPlanDto.class
 com\nexora\crm\dto\auth\SuperAdminLoginRequest.class
@@ -64,6 +69,7 @@ com\nexora\crm\dto\auth\UserSummaryDto.class
 com\nexora\crm\dto\dashboard\SuperAdminDashboardDto$StatItem.class
 com\nexora\crm\entity\SubscriptionPlan.class
 com\nexora\crm\controller\CompanyUserController.class
+com\nexora\crm\service\SubscriptionRevenueService.class
 com\nexora\crm\dto\auth\AuthResponse.class
 com\nexora\crm\exception\GlobalExceptionHandler.class
 com\nexora\crm\entity\RoleType.class
@@ -71,9 +77,11 @@ com\nexora\crm\dto\common\ApiResponse.class
 com\nexora\crm\repository\CompanySettingRepository.class
 com\nexora\crm\dto\dashboard\SuperAdminDashboardDto.class
 com\nexora\crm\controller\DashboardController.class
+com\nexora\crm\dto\dashboard\CompanyRevenueReportDto.class
 com\nexora\crm\dto\settings\PlatformSettingsDto.class
 com\nexora\crm\dto\auth\TokenRefreshResponse.class
 com\nexora\crm\security\CustomUserDetailsService.class
+com\nexora\crm\dto\customer\CustomerPaymentRequest.class
 com\nexora\crm\dto\customer\CustomerResponse.class
 com\nexora\crm\security\JwtAuthenticationEntryPoint.class
 com\nexora\crm\service\PlatformSettingService.class

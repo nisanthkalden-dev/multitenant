@@ -22,6 +22,7 @@ export function SuperAdminProvider({ children }) {
   const [plans, setPlans] = useState(subscriptionPlans);
   const [activities, setActivities] = useState(defaultActivities);
   const [stats, setStats] = useState(superAdminStats);
+  const [subscriptionMrr, setSubscriptionMrr] = useState(null);
 
   const [revenueMonthlyData, setRevenueMonthlyData] = useState(defaultRevenueData);
   const [revenueData, setRevenueData] = useState(defaultRevenueData);
@@ -44,13 +45,32 @@ export function SuperAdminProvider({ children }) {
     logoUrl: null
   });
 
-  // Profile Settings state
-  const [profileSettings, setProfileSettings] = useState({
-    fullName: 'Super Admin',
-    email: 'superadmin@nexora.app',
-    phone: '+91 98765 43210',
-    userId: 'superadmin',
-    avatarUrl: null
+  // Profile Settings state initialized from cached auth session if present
+  const [profileSettings, setProfileSettings] = useState(() => {
+    try {
+      const rawSession = localStorage.getItem('nexora_auth_session');
+      if (rawSession) {
+        const s = JSON.parse(rawSession);
+        if (s.user) {
+          return {
+            fullName: s.user.fullName || s.user.name || 'Platform Super Admin',
+            email: s.user.email || 'superadmin@nexora.com',
+            phone: s.user.phone || '+91 98765 43210',
+            userId: s.user.userId || 'superadmin',
+            avatarUrl: s.user.avatar && s.user.avatar.length > 5 ? s.user.avatar : null
+          };
+        }
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return {
+      fullName: 'Platform Super Admin',
+      email: 'superadmin@nexora.com',
+      phone: '+91 98765 43210',
+      userId: 'superadmin',
+      avatarUrl: null
+    };
   });
 
   // Security Settings state
@@ -100,6 +120,11 @@ export function SuperAdminProvider({ children }) {
       const res = await subscriptionApi.getAllSubscriptions({ page: 0, size: 100 });
       const subsList = res.data || [];
       setSubscriptions(subsList);
+      if (res.meta && res.meta.monthlyRecurringRevenue !== undefined) {
+        setSubscriptionMrr(res.meta.monthlyRecurringRevenue);
+      } else if (subsList.length > 0 && subsList[0].monthlyRecurringRevenue !== undefined) {
+        setSubscriptionMrr(subsList[0].monthlyRecurringRevenue);
+      }
       return subsList;
     } catch (err) {
       console.warn('Could not fetch subscriptions from backend:', err.message);
@@ -210,8 +235,8 @@ export function SuperAdminProvider({ children }) {
   const refreshSuperAdminData = refreshAll;
 
   useEffect(() => {
-    const rawSession = localStorage.getItem('nexora_auth_session');
-    if (rawSession || role === 'super_admin') {
+    // Only fetch platform-level data if user is a Super Admin
+    if (role === 'super_admin') {
       refreshAll();
     }
   }, [role, refreshAll]);
@@ -261,19 +286,28 @@ export function SuperAdminProvider({ children }) {
     }
   };
 
+  // Profile and Password persistence
   const saveProfileSettings = async (profileData) => {
     const res = await userApi.updateProfile({
       name: profileData.fullName,
+      fullName: profileData.fullName,
       phone: profileData.phone,
-      email: profileData.email
+      email: profileData.email,
+      avatar: profileData.avatarUrl
     });
+    const updated = {
+      fullName: res.fullName || res.name || profileData.fullName,
+      name: res.name || res.fullName || profileData.fullName,
+      phone: res.phone !== undefined ? res.phone : profileData.phone,
+      email: res.email || profileData.email,
+      userId: res.userId || profileData.userId || 'superadmin',
+      avatarUrl: res.avatar && res.avatar.length > 5 ? res.avatar : (profileData.avatarUrl || null)
+    };
     setProfileSettings(prev => ({
       ...prev,
-      fullName: res.name || res.fullName || prev.fullName,
-      phone: res.phone || prev.phone,
-      email: res.email || prev.email
+      ...updated
     }));
-    return res;
+    return updated;
   };
 
   const updateSubscriptionAction = async (id, subscriptionData) => {
@@ -378,7 +412,8 @@ export function SuperAdminProvider({ children }) {
         refreshSettings,
         refreshDashboard,
         refreshProfile,
-        refreshAll
+        refreshAll,
+        subscriptionMrr
       }}
     >
       {children}
