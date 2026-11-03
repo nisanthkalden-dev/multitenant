@@ -17,6 +17,9 @@ public class CustomerRequest {
     private String assignedTo;
     private String managerId;
     private String lastContact;
+    private String address;
+    private String contractStartDate;
+    private String contractEndDate;
 
     public CustomerRequest() {}
 
@@ -106,5 +109,29 @@ public class CustomerRequest {
 
     public void setLastContact(String lastContact) {
         this.lastContact = lastContact;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getContractStartDate() {
+        return contractStartDate;
+    }
+
+    public void setContractStartDate(String contractStartDate) {
+        this.contractStartDate = contractStartDate;
+    }
+
+    public String getContractEndDate() {
+        return contractEndDate;
+    }
+
+    public void setContractEndDate(String contractEndDate) {
+        this.contractEndDate = contractEndDate;
     }
 }

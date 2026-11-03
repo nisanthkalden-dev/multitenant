@@ -9,6 +9,8 @@ export default function SubscriptionsPage() {
   const {
     subscriptions,
     plans,
+    stats,
+    subscriptionMrr,
     updateSubscriptionAction,
     deleteSubscriptionAction,
     createPlanAction,
@@ -82,30 +84,22 @@ export default function SubscriptionsPage() {
         s.companyStatus?.toLowerCase() === 'suspended')
   ).length;
 
-  // Real MRR calculated from active subscriptions of non-suspended companies
+  // Real MRR centralized from backend database calculation
   const calculatedMrrNumber = useMemo(() => {
-    return subscriptions
-      .filter(
-        (s) =>
-          s.plan !== 'No subscription' &&
-          s.status?.toLowerCase() === 'active' &&
-          s.companyStatus?.toLowerCase() !== 'suspended'
-      )
-      .reduce((sum, s) => {
-        const rawAmt = s.price !== undefined && s.price !== null
-          ? String(s.price)
-          : (s.amount ? s.amount.replace(/[^0-9]/g, '') : '');
-        if (!rawAmt) return sum;
-        const val = parseInt(rawAmt, 10);
-        if (isNaN(val)) return sum;
-        return sum + (s.billingCycle?.toLowerCase() === 'annual' ? Math.round(val / 12) : val);
-      }, 0);
-  }, [subscriptions]);
+    if (subscriptionMrr !== undefined && subscriptionMrr !== null) {
+      return Number(subscriptionMrr);
+    }
+    const rawBackendMrr = stats?.monthlyRevenue?.value;
+    if (rawBackendMrr) {
+      const parsed = parseInt(rawBackendMrr.replace(/[^0-9]/g, ''), 10);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  }, [subscriptionMrr, stats?.monthlyRevenue?.value]);
 
   const totalMrrDisplay = calculatedMrrNumber > 0
-    ? `₹${calculatedMrrNumber.toLocaleString('en-IN')}`
-    : '₹0';
-
+    ? "₹" + calculatedMrrNumber.toLocaleString('en-IN')
+    : (stats?.monthlyRevenue?.value || "₹0");
   // Helper to extract clean numeric price
   const extractNumericPrice = (sub) => {
     if (sub.price !== undefined && sub.price !== null && sub.price !== '') {

@@ -52,9 +52,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // Strictly validate token: signature, expiration, and tokenType == ACCESS
             if (jwtService.validateAccessToken(token)) {
                 String email = jwtService.extractEmail(token);
+                String userIdentifier = jwtService.extractUserIdentifier(token);
 
-                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = this.userDetailsService.loadUserByUsername(email);
+                if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                    UserDetails userDetails = null;
+                    if (email != null) {
+                        try {
+                            userDetails = this.userDetailsService.loadUserByUsername(email);
+                        } catch (Exception ignored) {}
+                    }
+                    if (userDetails == null && userIdentifier != null) {
+                        try {
+                            userDetails = this.userDetailsService.loadUserByUsername(userIdentifier);
+                        } catch (Exception ignored) {}
+                    }
 
                     if (userDetails instanceof CustomUserDetails customUser) {
                         // PART 3: If user belongs to a company that is currently suspended, immediately block access

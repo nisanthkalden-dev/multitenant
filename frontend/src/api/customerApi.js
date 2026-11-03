@@ -35,5 +35,23 @@ export const customerApi = {
       method: 'DELETE'
     });
     return res.data;
+  },
+
+  getPaymentSummary: async (id) => {
+    const res = await apiClient(`/customers/${id}/payment-summary`);
+    return res.data;
+  },
+
+  getPaymentHistory: async (id) => {
+    const res = await apiClient(`/customers/${id}/payments`);
+    return res.data;
+  },
+
+  addPayment: async (id, paymentData) => {
+    const res = await apiClient(`/customers/${id}/payments`, {
+      method: 'POST',
+      body: paymentData
+    });
+    return res.data;
   }
 };

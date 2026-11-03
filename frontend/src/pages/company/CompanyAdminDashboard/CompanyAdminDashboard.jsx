@@ -241,22 +241,22 @@ export default function CompanyAdminDashboard() {
 
             <div className="company-sub-card">
               <div className="sub-tier-row">
-                <span className="sub-plan-badge font-mono">ENTERPRISE TIER</span>
+                <span className="sub-plan-badge font-mono">{(dashboardData?.subscriptionSummary?.plan || 'Growth').toUpperCase()} PLAN</span>
                 <span className="sub-status-live font-mono">
-                  <span className="dot"></span> ACTIVE
+                  <span className="dot"></span> {(dashboardData?.subscriptionSummary?.status || 'Active').toUpperCase()}
                 </span>
               </div>
               <div className="sub-pricing-row">
-                <span className="sub-amount font-mono">{metrics.monthlyRevenue}</span>
-                <span className="sub-cycle font-mono">/ total value</span>
+                <span className="sub-amount font-mono">{dashboardData?.subscriptionSummary?.price || '—'}</span>
+                <span className="sub-cycle font-mono">/ {dashboardData?.subscriptionSummary?.billingCycle || 'Monthly'}</span>
               </div>
               <p className="sub-desc text-muted text-sm">
-                Isolated database clustering with tenant encryption enabled. Organization seat allocation active.
+                Isolated database clustering with tenant encryption enabled. Next renewal: <strong>{dashboardData?.subscriptionSummary?.renewalDate || '—'}</strong>.
               </p>
               <div className="sub-seat-bar">
                 <div className="seat-meta font-mono">
                   <span>Workforce Users:</span>
-                  <span>{metrics.totalEmployees} Active Seats</span>
+                  <span>{metrics.totalEmployees} / {dashboardData?.subscriptionSummary?.userLimit || 20} Active Seats</span>
                 </div>
               </div>
             </div>

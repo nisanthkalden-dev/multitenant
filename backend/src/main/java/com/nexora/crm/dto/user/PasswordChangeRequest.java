@@ -12,12 +12,22 @@ public class PasswordChangeRequest {
     @Size(min = 6, message = "New password must be at least 6 characters")
     private String newPassword;
 
+    private String confirmPassword;
+
     public PasswordChangeRequest() {}
 
     public PasswordChangeRequest(String oldPassword, String newPassword) {
         this.oldPassword = oldPassword;
         this.currentPassword = oldPassword;
         this.newPassword = newPassword;
+        this.confirmPassword = newPassword;
+    }
+
+    public PasswordChangeRequest(String oldPassword, String newPassword, String confirmPassword) {
+        this.oldPassword = oldPassword;
+        this.currentPassword = oldPassword;
+        this.newPassword = newPassword;
+        this.confirmPassword = confirmPassword;
     }
 
     public String getOldPassword() {
@@ -48,5 +58,13 @@ public class PasswordChangeRequest {
 
     public void setNewPassword(String newPassword) {
         this.newPassword = newPassword;
+    }
+
+    public String getConfirmPassword() {
+        return confirmPassword;
+    }
+
+    public void setConfirmPassword(String confirmPassword) {
+        this.confirmPassword = confirmPassword;
     }
 }

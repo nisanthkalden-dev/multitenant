@@ -1,5 +1,8 @@
 package com.nexora.crm.dto.customer;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 public class CustomerResponse {
     private String id;
     private String companyId;
@@ -15,6 +18,19 @@ public class CustomerResponse {
     private String assignedTo;
     private String managerId;
     private String lastContact;
+    private String address;
+    private String contractStartDate;
+    private String contractEndDate;
+
+    // Financial calculation fields
+    private BigDecimal totalContractAmount;
+    private BigDecimal totalAmountPaid;
+    private BigDecimal remainingBalance;
+    private String formattedContractValue;
+    private String formattedAmountPaid;
+    private String formattedRemainingBalance;
+
+    private List<CustomerPaymentDto> recentPayments;
 
     public CustomerResponse() {}
 
@@ -100,12 +116,14 @@ public class CustomerResponse {
     }
 
     public String getValue() {
-        return value;
+        return value != null ? value : contractValue;
     }
 
     public void setValue(String value) {
         this.value = value;
-        this.contractValue = value;
+        if (this.contractValue == null) {
+            this.contractValue = value;
+        }
     }
 
     public String getAssignedTo() {
@@ -130,5 +148,85 @@ public class CustomerResponse {
 
     public void setLastContact(String lastContact) {
         this.lastContact = lastContact;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getContractStartDate() {
+        return contractStartDate;
+    }
+
+    public void setContractStartDate(String contractStartDate) {
+        this.contractStartDate = contractStartDate;
+    }
+
+    public String getContractEndDate() {
+        return contractEndDate;
+    }
+
+    public void setContractEndDate(String contractEndDate) {
+        this.contractEndDate = contractEndDate;
+    }
+
+    public BigDecimal getTotalContractAmount() {
+        return totalContractAmount;
+    }
+
+    public void setTotalContractAmount(BigDecimal totalContractAmount) {
+        this.totalContractAmount = totalContractAmount;
+    }
+
+    public BigDecimal getTotalAmountPaid() {
+        return totalAmountPaid;
+    }
+
+    public void setTotalAmountPaid(BigDecimal totalAmountPaid) {
+        this.totalAmountPaid = totalAmountPaid;
+    }
+
+    public BigDecimal getRemainingBalance() {
+        return remainingBalance;
+    }
+
+    public void setRemainingBalance(BigDecimal remainingBalance) {
+        this.remainingBalance = remainingBalance;
+    }
+
+    public String getFormattedContractValue() {
+        return formattedContractValue;
+    }
+
+    public void setFormattedContractValue(String formattedContractValue) {
+        this.formattedContractValue = formattedContractValue;
+    }
+
+    public String getFormattedAmountPaid() {
+        return formattedAmountPaid;
+    }
+
+    public void setFormattedAmountPaid(String formattedAmountPaid) {
+        this.formattedAmountPaid = formattedAmountPaid;
+    }
+
+    public String getFormattedRemainingBalance() {
+        return formattedRemainingBalance;
+    }
+
+    public void setFormattedRemainingBalance(String formattedRemainingBalance) {
+        this.formattedRemainingBalance = formattedRemainingBalance;
+    }
+
+    public List<CustomerPaymentDto> getRecentPayments() {
+        return recentPayments;
+    }
+
+    public void setRecentPayments(List<CustomerPaymentDto> recentPayments) {
+        this.recentPayments = recentPayments;
     }
 }

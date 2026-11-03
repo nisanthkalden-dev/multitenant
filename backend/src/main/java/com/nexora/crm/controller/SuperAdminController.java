@@ -9,11 +9,14 @@ import com.nexora.crm.dto.company.CompanyRequest;
 import com.nexora.crm.dto.company.CompanyResponse;
 import com.nexora.crm.dto.dashboard.SuperAdminDashboardDto;
 import com.nexora.crm.dto.subscription.SubscriptionDto;
+import com.nexora.crm.dto.user.PasswordChangeRequest;
 import com.nexora.crm.entity.Company;
 import com.nexora.crm.service.AuthService;
 import com.nexora.crm.service.CompanyService;
 import com.nexora.crm.service.DashboardService;
+import com.nexora.crm.service.SubscriptionRevenueService;
 import com.nexora.crm.service.SubscriptionService;
+import com.nexora.crm.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -27,6 +30,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/super-admin")
@@ -37,6 +41,8 @@ public class SuperAdminController {
     private final DashboardService dashboardService;
     private final CompanyService companyService;
     private final SubscriptionService subscriptionService;
+    private final SubscriptionRevenueService subscriptionRevenueService;
+    private final UserService userService;
     private final com.nexora.crm.service.PlatformSettingService platformSettingService;
 
     public SuperAdminController(
@@ -44,12 +50,16 @@ public class SuperAdminController {
             DashboardService dashboardService,
             CompanyService companyService,
             SubscriptionService subscriptionService,
+            SubscriptionRevenueService subscriptionRevenueService,
+            UserService userService,
             com.nexora.crm.service.PlatformSettingService platformSettingService
     ) {
         this.authService = authService;
         this.dashboardService = dashboardService;
         this.companyService = companyService;
         this.subscriptionService = subscriptionService;
+        this.subscriptionRevenueService = subscriptionRevenueService;
+        this.userService = userService;
         this.platformSettingService = platformSettingService;
     }
 
@@ -68,16 +78,15 @@ public class SuperAdminController {
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "Super Admin platform command metrics, MRR, and platform distribution")
     public ResponseEntity<ApiResponse<SuperAdminDashboardDto>> getDashboard(
-            @RequestParam(required = false, defaultValue = "6M") String period
+            @RequestParam(defaultValue = "6M") String period
     ) {
         SuperAdminDashboardDto dashboard = dashboardService.getSuperAdminDashboard(period);
         return ResponseEntity.ok(ApiResponse.ok("Platform metrics retrieved successfully", dashboard));
     }
 
-
     @GetMapping("/companies")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Get paginated, searchable companies list")
+    @Operation(summary = "Browse all tenant workspaces with server-side pagination and filters")
     public ResponseEntity<ApiResponse<List<CompanyResponse>>> getCompanies(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -85,10 +94,7 @@ public class SuperAdminController {
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "createdAt,desc") String sort
     ) {
-        String[] sortParts = sort.split(",");
-        Sort sorting = Sort.by(sortParts.length > 1 && sortParts[1].equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC, sortParts[0]);
-        Pageable pageable = PageRequest.of(page, size, sorting);
-
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         Page<CompanyResponse> companyPage = companyService.getCompanies(search, status, pageable);
         PaginationMetadata meta = new PaginationMetadata(
                 companyPage.getNumber(),
@@ -102,10 +108,10 @@ public class SuperAdminController {
 
     @GetMapping("/companies/{id}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "Get company details by ID")
+    @Operation(summary = "Get full detailed dossier for single tenant company")
     public ResponseEntity<ApiResponse<CompanyResponse>> getCompanyById(@PathVariable String id) {
-        CompanyResponse res = companyService.getCompanyById(id);
-        return ResponseEntity.ok(ApiResponse.ok("Company details retrieved successfully", res));
+        CompanyResponse response = companyService.getCompanyById(id);
+        return ResponseEntity.ok(ApiResponse.ok("Company details retrieved successfully", response));
     }
 
     @PostMapping("/companies")
@@ -135,14 +141,19 @@ public class SuperAdminController {
 
     @GetMapping("/subscriptions")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
-    @Operation(summary = "View all active/expired subscriptions across platform")
+    @Operation(summary = "View all active/expired subscriptions across platform with centralized MRR")
     public ResponseEntity<ApiResponse<List<SubscriptionDto>>> getSubscriptions(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size
     ) {
         Page<SubscriptionDto> subs = subscriptionService.getAllCompanySubscriptions(PageRequest.of(page, size));
+        long mrr = subscriptionRevenueService.calculateMonthlyRecurringRevenue();
         PaginationMetadata meta = new PaginationMetadata(subs.getNumber(), subs.getSize(), subs.getTotalElements(), subs.getTotalPages(), subs.isLast());
-        return ResponseEntity.ok(ApiResponse.ok("Subscriptions retrieved successfully", subs.getContent(), meta));
+        Map<String, Object> extraMeta = Map.of(
+                "monthlyRecurringRevenue", mrr,
+                "mrrDisplay", mrr > 0 ? "₹" + String.format(java.util.Locale.US, "%,d", mrr) : "₹0"
+        );
+        return ResponseEntity.ok(ApiResponse.ok("Subscriptions retrieved successfully", subs.getContent(), meta, extraMeta));
     }
 
     @GetMapping("/subscriptions/{id}")
@@ -214,7 +225,7 @@ public class SuperAdminController {
     }
 
     // ==========================================
-    // Super Admin General Platform Settings
+    // Super Admin Settings & Password
     // ==========================================
     @GetMapping("/settings")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -240,5 +251,13 @@ public class SuperAdminController {
     public ResponseEntity<ApiResponse<com.nexora.crm.dto.settings.PlatformSettingsDto>> removePlatformLogo() {
         com.nexora.crm.dto.settings.PlatformSettingsDto updated = platformSettingService.removeLogo();
         return ResponseEntity.ok(ApiResponse.ok("Platform brand logo removed successfully from MySQL", updated));
+    }
+
+    @PutMapping("/settings/change-password")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @Operation(summary = "Update authenticated Super Admin password via settings")
+    public ResponseEntity<ApiResponse<Void>> changeSuperAdminPassword(@Valid @RequestBody PasswordChangeRequest request) {
+        userService.changeCurrentUserPassword(request);
+        return ResponseEntity.ok(ApiResponse.ok("Super Admin password updated successfully", null));
     }
 }
