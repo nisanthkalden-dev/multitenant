@@ -94,7 +94,7 @@ export default function CompanyAdminDashboard() {
         <div className="crm-stat-card">
           <div className="stat-card-header">
             <span className="stat-title">Total Customers</span>
-            <div className="stat-icon-wrap" style={{ color: '#10b981' }}>
+            <div className="stat-icon-wrap" style={{ color: 'var(--secondary)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
@@ -110,7 +110,7 @@ export default function CompanyAdminDashboard() {
         <div className="crm-stat-card">
           <div className="stat-card-header">
             <span className="stat-title">Total Leads in Pipeline</span>
-            <div className="stat-icon-wrap" style={{ color: '#38bdf8' }}>
+            <div className="stat-icon-wrap" style={{ color: 'var(--tertiary)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
               </svg>
@@ -125,7 +125,7 @@ export default function CompanyAdminDashboard() {
         <div className="crm-stat-card">
           <div className="stat-card-header">
             <span className="stat-title">Active Pending Tasks</span>
-            <div className="stat-icon-wrap" style={{ color: '#f59e0b' }}>
+            <div className="stat-icon-wrap" style={{ color: 'var(--secondary)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>

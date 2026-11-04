@@ -6186,30 +6186,43 @@ select.form-input option,
   z-index: 140;
 }
 
-/* Light Mode Overrides for Super Admin */
+/* Light Mode Overrides for Super Admin & Tenant Workspace */
 [data-theme="light"] .sa-app-layout,
-[data-theme="light"] .sa-main-content {
+[data-theme="light"] .sa-main-content,
+[data-theme="light"] .crm-dashboard-app,
+[data-theme="light"] .app-main-layout,
+[data-theme="light"] .app-workspace-body {
   background-color: #f7f5f0;
 }
 
 [data-theme="light"] .app-sidebar,
 [data-theme="light"] .sa-sidebar {
   background-color: #ffffff;
+  border-color: rgba(34, 97, 146, 0.12);
 }
 
-[data-theme="light"] .sa-topbar {
+[data-theme="light"] .sa-topbar,
+[data-theme="light"] .app-topbar {
   background-color: #ffffff;
+  border-color: rgba(34, 97, 146, 0.12);
 }
 
 [data-theme="light"] .sa-card,
 [data-theme="light"] .sa-stat-card,
 [data-theme="light"] .sa-form-card,
-[data-theme="light"] .sa-modal-card {
+[data-theme="light"] .sa-modal-card,
+[data-theme="light"] .crm-card,
+[data-theme="light"] .crm-stat-card,
+[data-theme="light"] .crm-panel-card,
+[data-theme="light"] .crm-table-container,
+[data-theme="light"] .panel-card-header,
+[data-theme="light"] .kanban-column {
   background-color: #ffffff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
-[data-theme="light"] .sa-table th {
+[data-theme="light"] .sa-table th,
+[data-theme="light"] .crm-table th {
   background-color: #f4efe6;
 }
 
@@ -6707,31 +6720,19 @@ select.form-input option,
   flex-wrap: wrap;
 }
 
-.admin-banner {
-  background: linear-gradient(135deg, rgba(235, 94, 40, 0.12), rgba(201, 93, 44, 0.04));
-  border-color: rgba(235, 94, 40, 0.25);
-}
-.admin-banner .banner-badge {
-  background-color: rgba(235, 94, 40, 0.2);
-  color: var(--tertiary);
-}
-
-.manager-banner {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12), rgba(14, 165, 233, 0.04));
-  border-color: rgba(56, 189, 248, 0.25);
-}
-.manager-banner .banner-badge {
-  background-color: rgba(56, 189, 248, 0.2);
-  color: #38bdf8;
-}
-
+.admin-banner,
+.manager-banner,
 .employee-banner {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.04));
-  border-color: rgba(16, 185, 129, 0.25);
+  background: linear-gradient(135deg, rgba(34, 97, 146, 0.15), rgba(239, 133, 87, 0.08));
+  border-color: rgba(239, 133, 87, 0.3);
 }
+
+.admin-banner .banner-badge,
+.manager-banner .banner-badge,
 .employee-banner .banner-badge {
-  background-color: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  background-color: rgba(239, 133, 87, 0.18);
+  border: 1px solid rgba(239, 133, 87, 0.35);
+  color: var(--tertiary);
 }
 
 /* Stat Cards Grid */
@@ -6882,21 +6883,21 @@ select.form-input option,
 }
 
 .role-admin, .badge-role-admin {
-  background-color: rgba(235, 94, 40, 0.15);
+  background-color: rgba(239, 133, 87, 0.15);
   color: var(--tertiary);
-  border: 1px solid rgba(235, 94, 40, 0.3);
+  border: 1px solid rgba(239, 133, 87, 0.35);
 }
 
 .role-manager, .badge-role-manager {
-  background-color: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  background-color: rgba(34, 97, 146, 0.18);
+  color: var(--secondary);
+  border: 1px solid rgba(34, 97, 146, 0.35);
 }
 
 .role-emp, .badge-role-employee {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background-color: rgba(234, 230, 222, 0.12);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 /* Topbar User Profile Menu */
@@ -7315,8 +7316,8 @@ select.form-input option,
 }
 
 .check-box-btn.checked {
-  background-color: #10b981;
-  border-color: #10b981;
+  background-color: var(--secondary);
+  border-color: var(--secondary);
 }
 
 .text-strikethrough {
@@ -7346,10 +7347,10 @@ select.form-input option,
   flex-shrink: 0;
 }
 .manager-bullet {
-  background-color: #38bdf8;
+  background-color: var(--secondary);
 }
 .employee-bullet {
-  background-color: #10b981;
+  background-color: var(--tertiary);
 }
 
 .act-action {
@@ -7397,8 +7398,9 @@ select.form-input option,
 .lead-stage-pill {
   padding: 2px 8px;
   border-radius: 4px;
-  background-color: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
+  background-color: rgba(34, 97, 146, 0.18);
+  color: var(--secondary);
+  border: 1px solid rgba(34, 97, 146, 0.3);
 }
 
 /* Subscription Box */
@@ -7416,15 +7418,16 @@ select.form-input option,
 .sub-plan-badge {
   padding: 4px 10px;
   border-radius: 4px;
-  background-color: rgba(235, 94, 40, 0.15);
+  background-color: rgba(239, 133, 87, 0.15);
   color: var(--tertiary);
   font-weight: 700;
   font-size: 0.8rem;
+  border: 1px solid rgba(239, 133, 87, 0.3);
 }
 
 .sub-status-live {
   font-size: 0.75rem;
-  color: #10b981;
+  color: var(--tertiary);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -7433,7 +7436,7 @@ select.form-input option,
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background-color: #10b981;
+  background-color: var(--tertiary);
 }
 
 .sub-pricing-row {
@@ -7517,8 +7520,8 @@ select.form-input option,
   color: #f59e0b;
 }
 .task-done {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+  background-color: rgba(34, 97, 146, 0.18);
+  color: var(--secondary);
 }
 
 .task-due {
@@ -7551,7 +7554,7 @@ select.form-input option,
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #38bdf8, #0284c7);
+  background: linear-gradient(135deg, var(--secondary), var(--tertiary));
   color: #fff;
   font-weight: 700;
   font-size: 0.85rem;

@@ -136,7 +136,7 @@ export default function EmployeeDashboard() {
         <div className="crm-stat-card">
           <div className="stat-card-header">
             <span className="stat-title">My Active Pipeline</span>
-            <div className="stat-icon-wrap" style={{ color: '#38bdf8' }}>
+            <div className="stat-icon-wrap" style={{ color: 'var(--secondary)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
               </svg>
@@ -151,7 +151,7 @@ export default function EmployeeDashboard() {
         <div className="crm-stat-card">
           <div className="stat-card-header">
             <span className="stat-title">Open Action Tasks</span>
-            <div className="stat-icon-wrap" style={{ color: '#f59e0b' }}>
+            <div className="stat-icon-wrap" style={{ color: 'var(--tertiary)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 11l3 3L22 4"></path>
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
@@ -167,7 +167,7 @@ export default function EmployeeDashboard() {
         <div className="crm-stat-card">
           <div className="stat-card-header">
             <span className="stat-title">Task Completion</span>
-            <div className="stat-icon-wrap" style={{ color: '#10b981' }}>
+            <div className="stat-icon-wrap" style={{ color: 'var(--secondary)' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
