@@ -126,20 +126,20 @@ export default function ReportsPage() {
               </h2>
               <p className="banner-subtitle" style={{ maxWidth: '750px', margin: 0, fontSize: '0.86rem' }}>
                 Total contracted value across <strong>{revenueReport?.totalCustomersCount || 0}</strong> client accounts.
-                Collected cash: <strong style={{ color: '#10b981' }}>{totalPaidAmount}</strong> ({settlementRate}% cleared) with <strong style={{ color: '#f59e0b' }}>{totalRemainingBalance}</strong> currently outstanding.
+                Collected cash: <strong style={{ color: 'var(--tertiary)' }}>{totalPaidAmount}</strong> ({settlementRate}% cleared) with <strong style={{ color: 'var(--secondary)' }}>{totalRemainingBalance}</strong> currently outstanding.
               </p>
             </div>
             <div className="banner-actions" style={{ minWidth: '220px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
               <div style={{ width: '100%', textAlign: 'right' }}>
                 <span className="font-mono text-xs text-muted">Overall Collection Velocity</span>
-                <div className="font-mono font-bold text-lg" style={{ color: '#10b981' }}>{settlementRate}%</div>
+                <div className="font-mono font-bold text-lg" style={{ color: 'var(--tertiary)' }}>{settlementRate}%</div>
               </div>
               <div style={{ width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '4px', overflow: 'hidden' }}>
                 <div
                   style={{
                     height: '100%',
                     width: `${Math.min(settlementRate, 100)}%`,
-                    background: 'linear-gradient(90deg, #10b981, #6366f1)',
+                    background: 'linear-gradient(90deg, var(--secondary), var(--tertiary))',
                     borderRadius: '4px'
                   }}
                 />
@@ -150,12 +150,12 @@ export default function ReportsPage() {
           {/* PRIMARY 4-STAT FINANCIAL KPI GRID */}
           <div className="crm-stats-grid" style={{ margin: 0 }}>
             {/* Card 1: Total Contracted Revenue */}
-            <div className="crm-stat-card" style={{ borderTop: '3px solid #6366f1' }}>
+            <div className="crm-stat-card" style={{ borderTop: '3px solid var(--secondary)' }}>
               <div className="stat-card-header">
                 <span className="stat-title font-mono uppercase" style={{ fontSize: '0.75rem', letterSpacing: '0.04em' }}>
                   Total Contract Value
                 </span>
-                <div className="stat-icon-wrap" style={{ color: '#6366f1', background: 'rgba(99, 102, 241, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                <div className="stat-icon-wrap" style={{ color: 'var(--secondary)', background: 'rgba(34, 97, 146, 0.15)', padding: '6px', borderRadius: '8px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                     <line x1="12" y1="1" x2="12" y2="23"></line>
                     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
@@ -170,18 +170,18 @@ export default function ReportsPage() {
             </div>
 
             {/* Card 2: Verified Collected Cash */}
-            <div className="crm-stat-card" style={{ borderTop: '3px solid #10b981' }}>
+            <div className="crm-stat-card" style={{ borderTop: '3px solid var(--tertiary)' }}>
               <div className="stat-card-header">
                 <span className="stat-title font-mono uppercase" style={{ fontSize: '0.75rem', letterSpacing: '0.04em' }}>
                   Collected (Paid In Cash)
                 </span>
-                <div className="stat-icon-wrap" style={{ color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '6px', borderRadius: '8px' }}>
+                <div className="stat-icon-wrap" style={{ color: 'var(--tertiary)', background: 'rgba(239, 133, 87, 0.15)', padding: '6px', borderRadius: '8px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                 </div>
               </div>
-              <div className="stat-number font-mono" style={{ fontSize: '1.75rem', color: '#10b981' }}>{totalPaidAmount}</div>
+              <div className="stat-number font-mono" style={{ fontSize: '1.75rem', color: 'var(--tertiary)' }}>{totalPaidAmount}</div>
               <div className="stat-footer font-mono text-muted" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Settlement: <strong>{settlementRate}%</strong></span>
                 <span className="status-pill status-active font-mono text-xs" style={{ padding: '1px 6px' }}>Received</span>
@@ -189,7 +189,7 @@ export default function ReportsPage() {
             </div>
 
             {/* Card 3: Receivables Outstanding */}
-            <div className="crm-stat-card" style={{ borderTop: '3px solid #f59e0b' }}>
+            <div className="crm-stat-card" style={{ borderTop: '3px solid var(--secondary)' }}>
               <div className="stat-card-header">
                 <span className="stat-title font-mono uppercase" style={{ fontSize: '0.75rem', letterSpacing: '0.04em' }}>
                   Balance to Settle
@@ -320,10 +320,10 @@ export default function ReportsPage() {
                         <td className="font-mono font-bold text-primary" style={{ textAlign: 'right' }}>
                           {item.formattedContractValue}
                         </td>
-                        <td className="font-mono font-bold" style={{ textAlign: 'right', color: '#10b981' }}>
+                        <td className="font-mono font-bold" style={{ textAlign: 'right', color: 'var(--tertiary)' }}>
                           {item.formattedPaidAmount}
                         </td>
-                        <td className="font-mono font-bold" style={{ textAlign: 'right', color: item.remainingBalance > 0 ? '#f59e0b' : '#10b981' }}>
+                        <td className="font-mono font-bold" style={{ textAlign: 'right', color: item.remainingBalance > 0 ? 'var(--secondary)' : 'var(--tertiary)' }}>
                           {item.formattedRemainingBalance}
                         </td>
                         <td>
@@ -333,7 +333,7 @@ export default function ReportsPage() {
                                 style={{
                                   height: '100%',
                                   width: `${Math.min(item.settlementPercentage, 100)}%`,
-                                  background: item.status === 'Settled' ? '#10b981' : '#6366f1',
+                                  background: item.status === 'Settled' ? 'var(--tertiary)' : 'var(--secondary)',
                                   borderRadius: '4px'
                                 }}
                               />
@@ -350,9 +350,9 @@ export default function ReportsPage() {
                               display: 'inline-block',
                               minWidth: '95px',
                               textAlign: 'center',
-                              color: item.status === 'Settled' ? '#10b981' : item.status === 'Partially Paid' ? '#f59e0b' : 'var(--text-muted)',
-                              background: item.status === 'Settled' ? 'rgba(16, 185, 129, 0.1)' : item.status === 'Partially Paid' ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-subtle-box)',
-                              border: item.status === 'Settled' ? '1px solid rgba(16, 185, 129, 0.3)' : item.status === 'Partially Paid' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid var(--border-color)'
+                              color: item.status === 'Settled' ? 'var(--tertiary)' : item.status === 'Partially Paid' ? 'var(--secondary)' : 'var(--text-muted)',
+                              background: item.status === 'Settled' ? 'rgba(239, 133, 87, 0.12)' : item.status === 'Partially Paid' ? 'rgba(34, 97, 146, 0.15)' : 'var(--bg-subtle-box)',
+                              border: item.status === 'Settled' ? '1px solid rgba(239, 133, 87, 0.35)' : item.status === 'Partially Paid' ? '1px solid rgba(34, 97, 146, 0.35)' : '1px solid var(--border-color)'
                             }}
                           >
                             {item.status}
@@ -422,9 +422,9 @@ export default function ReportsPage() {
                             <span
                               className="status-pill font-mono text-xs"
                               style={{
-                                background: s.stage === 'Closed Won' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(56, 189, 248, 0.1)',
-                                color: s.stage === 'Closed Won' ? '#10b981' : '#38bdf8',
-                                border: s.stage === 'Closed Won' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)'
+                                background: s.stage === 'Closed Won' ? 'rgba(239, 133, 87, 0.15)' : 'rgba(34, 97, 146, 0.15)',
+                                color: s.stage === 'Closed Won' ? 'var(--tertiary)' : 'var(--secondary)',
+                                border: s.stage === 'Closed Won' ? '1px solid rgba(239, 133, 87, 0.35)' : '1px solid rgba(34, 97, 146, 0.35)'
                               }}
                             >
                               {s.stage === 'Closed Won' ? 'Won' : 'In Pipeline'}
@@ -455,7 +455,7 @@ export default function ReportsPage() {
                     <div className="font-semibold">Fully Settled Accounts</div>
                     <div className="font-mono text-xs text-muted">100% of contract received</div>
                   </div>
-                  <div className="font-mono font-bold text-lg" style={{ color: '#10b981' }}>
+                  <div className="font-mono font-bold text-lg" style={{ color: 'var(--tertiary)' }}>
                     {revenueReport?.fullySettledCustomersCount || 0} Accounts
                   </div>
                 </div>
@@ -465,7 +465,7 @@ export default function ReportsPage() {
                     <div className="font-semibold">Partially Settled / Due</div>
                     <div className="font-mono text-xs text-muted">Awaiting full payment closure</div>
                   </div>
-                  <div className="font-mono font-bold text-lg" style={{ color: '#f59e0b' }}>
+                  <div className="font-mono font-bold text-lg" style={{ color: 'var(--secondary)' }}>
                     {revenueReport?.pendingSettlementCustomersCount || 0} Accounts
                   </div>
                 </div>
@@ -485,7 +485,7 @@ export default function ReportsPage() {
                     <div className="font-semibold">Overall Clearance Ratio</div>
                     <div className="font-mono text-xs text-muted">Cash collected vs. total contracts</div>
                   </div>
-                  <div className="font-mono font-bold text-lg" style={{ color: '#10b981' }}>
+                  <div className="font-mono font-bold text-lg" style={{ color: 'var(--tertiary)' }}>
                     {settlementRate}%
                   </div>
                 </div>
